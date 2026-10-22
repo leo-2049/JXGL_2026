@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>顺翼 QMS 开发设计 V2</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 通达 OA（Office Anywhere）页面风格：蓝色顶栏 + 页签、左侧图标栏与菜单、浅灰蓝底 + 白色卡片；流程表单沿用通达表单样式。
+   刻意只做浅色一套，与 OA 本身保持一致。 */
+:root{
+  color-scheme:light;
+  --oa-blue:#1263f0; --oa-blue-2:#2b86ff; --oa-blue-soft:#e8f1ff; --oa-blue-line:#c6dcff;
+  --bg:#eef2f8; --paper:#ffffff; --ink:#1f2d3d; --muted:#6b7a8c; --rule:#e3e8ef; --soft:#f5f7fb;
+  --menu-ink:#2a3442; --rail:#f4f6fa;
+  --form-title:#1f6fe0; --form-red:#e0201f; --auto:#fffbd6; --auto-line:#e9df9a; --grey-in:#e8e8e8;
+  --tool-blue:#2f73e6; --tool-orange:#f0a040; --tool-green:#3aa66a;
+  --ok:#22a05a; --ok-soft:#e5f6ec; --warn:#d98a00; --warn-soft:#fff3dc; --bad:#e0201f; --bad-soft:#fde8e8;
+  --p1:#6a4fd8; --p1-soft:#efebfd; --p2:#1263f0; --p2-soft:#e8f1ff; --p3:#9a6b12; --p3-soft:#fbf1dc;
+  --sc:#d2541b; --sc-soft:#fde9de;
+  --f-body:"Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,sans-serif;
+  --f-form:"SimSun","Songti SC","Noto Serif SC",serif;
+  --f-mono:"Consolas","SFMono-Regular","JetBrains Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.7}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--oa-blue)}
+a{color:var(--oa-blue)}
+/* ---------------- 顶栏 ---------------- */
+.oa-top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;height:58px;display:flex;align-items:stretch;gap:18px;
+  background:linear-gradient(90deg,#0d5ce8,#1a73f5 60%,#2486ff);color:#fff;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.oa-logo{display:flex;align-items:center;font-size:17px;letter-spacing:.28em;font-weight:600;white-space:nowrap;font-variant:small-caps}
+.oa-logo sup{font-size:10px;letter-spacing:0;margin-left:2px}
+.oa-tabs{display:flex;align-items:flex-end;gap:2px;min-width:0;overflow-x:auto}
+.oa-tabs span{padding:0 24px;height:46px;display:flex;align-items:center;font-size:15px;white-space:nowrap;border-radius:4px 4px 0 0;color:#eaf2ff}
+.oa-tabs span.on{background:rgba(255,255,255,.22);color:#fff}
+.oa-tabs span.on::after{content:"×";margin-left:10px;opacity:.6;font-size:13px}
+.oa-search{margin-left:auto;align-self:center;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.88);color:var(--muted);border-radius:4px;padding:6px 14px;width:240px;font-size:13px}
+.oa-ava{align-self:center;width:36px;height:36px;border-radius:50%;background:#fff;color:var(--oa-blue);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;position:relative}
+.oa-ava::after{content:"";position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;background:#2ecc71;border:2px solid #fff}
+/* ---------------- 主体三栏 ---------------- */
+.oa-body{display:grid;grid-template-columns:62px 236px minmax(0,1fr);min-height:calc(100vh - 58px)}
+.oa-rail{background:var(--rail);border-right:1px solid var(--rule);display:flex;flex-direction:column;align-items:center;gap:22px;padding-top:16px;padding-left:env(safe-area-inset-left,0px)}
+.oa-rail i{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-style:normal}
+.oa-rail i.on{background:var(--oa-blue-soft)}
+.oa-rail svg{width:22px;height:22px}
+.oa-menu{background:var(--paper);border-right:1px solid var(--rule);position:sticky;top:calc(58px + env(safe-area-inset-top,0px));align-self:start;max-height:calc(100vh - 58px);overflow:auto;padding:10px 10px 30px}
+.oa-menu .grp{display:flex;align-items:center;gap:10px;padding:11px 12px;color:var(--menu-ink);font-size:15px;border-radius:6px}
+.oa-menu .grp::after{content:"›";margin-left:auto;color:#9aa6b4;font-size:18px}
+.oa-menu .grp.open{background:var(--oa-blue-soft);color:var(--oa-blue)}
+.oa-menu .grp.open::after{content:"⌄";font-size:14px}
+.oa-menu .grp b{width:18px;height:18px;border:1.6px solid currentColor;border-radius:4px;flex:none}
+.oa-menu a{display:block;padding:8px 12px 8px 40px;color:var(--menu-ink);text-decoration:none;font-size:14px;border-radius:4px}
+.oa-menu a:hover,.oa-menu a:focus-visible{color:var(--oa-blue);background:var(--soft);outline:none}
+.oa-menu a.cur{color:var(--oa-blue)}
+.oa-main{min-width:0;padding-block:16px 60px;padding-left:16px;padding-right:max(16px,env(safe-area-inset-right,0px))}
+/* ---------------- 内容卡片（文档区） ---------------- */
+.card{background:var(--paper);border-radius:6px;padding:20px 24px;margin-bottom:14px;box-shadow:0 1px 2px rgba(20,50,100,.05)}
+.page-title{font-size:26px;font-weight:700;color:#c8341f;margin:0 0 6px;font-family:var(--f-body)}
+.lead{color:var(--muted);max-width:90ch;margin:4px 0}
+.meta{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px;color:var(--muted);margin-top:10px}
+.meta b{color:var(--ink);font-weight:600}
+.counters{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;background:var(--oa-blue-soft);border:1px solid var(--oa-blue-line);border-radius:6px;padding:14px 18px;margin-top:14px}
+.counters div{font-size:13px;color:#3a4a5e}
+.counters b{display:block;font-size:26px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.3}
+h2{font-size:18px;font-weight:700;margin:0 0 10px;padding-left:10px;border-left:4px solid var(--oa-blue);line-height:1.3;scroll-margin-top:72px;text-wrap:balance}
+h3{font-size:16px;font-weight:700;margin:22px 0 8px;scroll-margin-top:72px}
+h4{font-size:14.5px;font-weight:700;margin:18px 0 6px;color:#24364d}
+p{margin:6px 0;max-width:92ch}
+.sec-intro{color:var(--muted);margin-bottom:10px}
+code,.mono{font-family:var(--f-mono);font-size:.9em}
+code{background:var(--soft);border:1px solid var(--rule);padding:0 4px;border-radius:3px;color:#24508f}
+.tbl{overflow-x:auto;margin:10px 0 16px;border:1px solid var(--rule);border-radius:4px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.55;background:var(--paper)}
+th,td{border-bottom:1px solid var(--rule);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#f3f6fb;color:#3a4a5e;font-weight:600;white-space:nowrap}
+tbody tr:hover td{background:#fafcff}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;font-size:12px;padding:0 7px;border-radius:3px;white-space:nowrap;line-height:20px;border:1px solid transparent}
+.t-p1{background:var(--p1-soft);color:var(--p1);border-color:#d8cff9}.t-p2{background:var(--p2-soft);color:var(--p2);border-color:var(--oa-blue-line)}.t-p3{background:var(--p3-soft);color:var(--p3);border-color:#f0dcae}
+.t-ok{background:var(--ok-soft);color:var(--ok)}.t-warn{background:var(--warn-soft);color:var(--warn)}.t-bad{background:var(--bad-soft);color:var(--bad)}
+.t-sc{background:var(--sc-soft);color:var(--sc);font-weight:700}.t-mute{background:var(--soft);color:var(--muted);border-color:var(--rule)}
+.t-new{background:var(--oa-blue);color:#fff}
+.callout{border:1px solid var(--oa-blue-line);border-left:4px solid var(--oa-blue);background:#f6faff;padding:10px 14px;margin:12px 0;border-radius:4px}
+.callout.warn{border-color:#f6d6a8;border-left-color:var(--warn);background:#fffaf0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px;margin:10px 0}
+.panel{border:1px solid var(--rule);border-radius:6px;padding:12px 16px;min-width:0;background:var(--paper)}
+.panel h4{margin-top:0}
+.panel ul,ul.tight{margin:6px 0;padding-left:20px}
+.panel li,ul.tight li{margin:2px 0}
+/* 架构 */
+.arch{display:grid;gap:8px;margin:12px 0}
+.layer{display:grid;grid-template-columns:130px minmax(0,1fr);gap:10px}
+.layer>.lname{background:var(--oa-blue);color:#fff;font-weight:600;font-size:13px;padding:10px;display:flex;align-items:center;border-radius:4px}
+.layer>.boxes{display:flex;flex-wrap:wrap;gap:8px}
+.box{border:1px solid var(--rule);background:var(--soft);padding:6px 11px;font-size:13px;border-radius:4px;min-width:0}
+.box b{display:block;font-size:13.5px}.box small{color:var(--muted)}
+.box.oa{background:var(--oa-blue-soft);border-color:var(--oa-blue-line)}
+.box.qms{background:#eefaf3;border-color:#bfe6cf}
+.box.ext{border-style:dashed;background:var(--paper)}
+/* 流程（通达流程图风格的步骤块） */
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 4px;margin:10px 0 4px;padding:12px;background:var(--soft);border:1px solid var(--rule);border-radius:4px}
+.node{border:1px solid var(--oa-blue-line);background:var(--paper);border-radius:4px;padding:6px 12px;font-size:13px;line-height:1.35;text-align:center;min-width:0;box-shadow:0 1px 0 var(--oa-blue-line)}
+.node small{display:block;color:var(--muted);font-size:11.5px}
+.node.dec{border:1px dashed var(--warn);background:#fffaf0}
+.node.end{background:var(--oa-blue);color:#fff;border-color:var(--oa-blue)}.node.end small{color:#dbe8ff}
+.node.opt{border-style:dashed}
+.arr{color:var(--oa-blue);font-weight:700;padding:0 2px}
+.flow-note{font-size:13px;color:var(--muted);margin:2px 0 14px}
+.flow-note b{color:var(--sc);font-weight:600}
+.states{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.st{font-family:var(--f-mono);font-size:12px;padding:2px 8px;border:1px solid var(--oa-blue-line);background:var(--oa-blue-soft);color:#24508f;border-radius:3px}
+.st em{font-style:normal;font-family:var(--f-body);color:var(--ink);margin-left:4px}
+footer{margin-top:24px;font-size:12.5px;color:var(--muted)}
+/* ================= 原型：OA 窗口 ================= */
+.proto-tabs{display:flex;flex-wrap:wrap;gap:0;border-bottom:2px solid var(--oa-blue);margin-top:8px}
+.proto-tabs button{font:inherit;font-size:14px;border:none;background:transparent;color:var(--ink);padding:8px 18px;cursor:pointer;border-radius:4px 4px 0 0}
+.proto-tabs button[aria-selected="true"]{background:var(--oa-blue);color:#fff}
+.proto-tabs button:focus-visible{outline:2px solid var(--oa-blue-2);outline-offset:1px}
+.win{border:1px solid #c9d3e1;border-radius:0 0 6px 6px;overflow:hidden;background:var(--bg);margin-bottom:6px}
+.win-top{height:44px;display:flex;align-items:stretch;gap:12px;padding:0 12px;background:linear-gradient(90deg,#0d5ce8,#2486ff);color:#fff;overflow:hidden}
+.win-top .oa-logo{font-size:13px}
+.win-top .oa-tabs span{height:36px;padding:0 16px;font-size:13.5px}
+.win-body{display:grid;grid-template-columns:150px minmax(0,1fr);min-height:420px}
+.win-menu{background:var(--paper);border-right:1px solid var(--rule);padding:8px 6px;font-size:13px}
+.win-menu div{padding:7px 10px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win-menu .h{background:var(--oa-blue-soft);color:var(--oa-blue)}
+.win-menu .s{padding-left:22px}
+.win-menu .s.on{color:var(--oa-blue)}
+.win-main{min-width:0;overflow-x:auto;position:relative}
+/* 新建工作 */
+.nw-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px;background:var(--paper);border-bottom:1px solid var(--rule)}
+.nw-head h5{margin:0;font-size:22px;color:#c8341f;font-weight:700;margin-right:auto}
+.nw-q{display:flex;border:1px solid var(--oa-blue);border-radius:16px;overflow:hidden;font-size:13px}
+.nw-q span{padding:4px 14px;color:var(--muted)}.nw-q b{background:var(--oa-blue);color:#fff;padding:4px 14px;font-weight:400}
+.nw-grid{display:grid;grid-template-columns:150px minmax(0,1fr)}
+.nw-cat{background:var(--soft);border-right:1px solid var(--rule)}
+.nw-cat div{padding:10px 14px;font-size:13.5px;border-bottom:1px solid #edf0f5;display:flex;gap:8px;align-items:center}
+.nw-cat div::before{content:"";width:16px;height:11px;border:1.5px solid #a9b4c2;border-radius:2px}
+.nw-cat .on{background:var(--paper);color:var(--oa-blue)}.nw-cat .on::before{border-color:var(--oa-blue)}
+.nw-list{padding:12px 16px;background:var(--paper)}
+.nw-list h6{font-size:16px;margin:0 0 10px;font-weight:700}
+.nw-item{display:flex;align-items:center;gap:12px;border:1px solid var(--rule);border-left:3px solid var(--oa-blue);padding:9px 14px;margin-bottom:8px}
+.nw-item div{margin-right:auto;min-width:0}
+.nw-item b{display:block;font-weight:400;font-size:14.5px}
+.nw-item small{color:var(--muted)}
+.nw-ico{width:30px;height:30px;border:1.5px solid #9aa6b4;border-radius:3px;display:flex;align-items:center;justify-content:center;color:#7a8696;font-style:italic;font-family:var(--f-form);flex:none}
+/* 流程办理表单 */
+.wf-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 16px;background:var(--paper);border-bottom:1px solid var(--rule)}
+.wf-head .no{color:var(--form-red);font-family:var(--f-form);font-weight:700;font-size:15px;margin-right:auto}
+.wf-head .step{font-size:13px;color:var(--ink)}
+.wf-head .lv{border:1px solid var(--rule);border-radius:4px;padding:2px 10px;font-size:13px}
+.wf-grid{display:grid;grid-template-columns:66px minmax(0,1fr)}
+.wf-tools{background:#eef3fb;border-right:1px solid var(--rule);display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 0;font-size:12px}
+.wf-tools .tb{width:56px;height:58px;border-radius:3px;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.wf-tools .tb.b{background:var(--tool-blue)}.wf-tools .tb.o{background:var(--tool-orange)}.wf-tools .tb.g{background:var(--tool-green)}
+.wf-tools .tl{color:#47566a;text-align:center}
+.wf-tools .tl::before{content:"";display:block;width:18px;height:14px;margin:0 auto 2px;background:#2f73e6;border-radius:2px}
+.wf-paper{padding:16px;background:#fff;overflow-x:auto}
+.form{border:1px solid #b9c3d1;max-width:900px;margin:0 auto;font-family:var(--f-form);font-size:14.5px;min-width:620px}
+.form .ft{text-align:center;color:var(--form-title);font-size:26px;letter-spacing:.08em;padding:16px 0 4px;font-weight:700}
+.form .fmeta{text-align:right;padding:0 16px 8px;font-size:13.5px}
+.form table{font-size:14px;font-family:var(--f-form)}
+.form td{border:1px solid #d3dae4;padding:6px 10px;vertical-align:middle}
+.form td.l{width:110px;text-align:right;white-space:nowrap;color:#333}
+.form td.l.blue{color:var(--form-title)}
+.fi{display:inline-block;min-width:160px;max-width:100%;padding:3px 8px;border:1px solid #c9d2de;background:#fff;font-family:var(--f-form);min-height:26px}
+.fi.auto{background:var(--auto);border-color:var(--auto-line);color:#1a4fb8}
+.fi.grey{background:var(--grey-in);border-color:#d5d5d5}
+.fi.wide{display:block;width:100%}
+.fi.area{display:block;width:100%;min-height:58px}
+.req{color:var(--form-red);margin-left:4px}
+.form .sect td{background:#eef3fb;border-left:4px solid var(--oa-blue);font-weight:700;font-family:var(--f-body)}
+.radio{display:inline-flex;align-items:center;gap:4px;margin-right:14px}
+.radio::before{content:"";width:13px;height:13px;border:1px solid #aab4c2;border-radius:50%;background:#fff}
+.radio.on::before{background:radial-gradient(var(--oa-blue) 0 3px,#fff 3.5px);border-color:var(--oa-blue)}
+.chk::before{border-radius:2px}
+.chk.on::before{background:var(--oa-blue);box-shadow:inset 0 0 0 2px #fff}
+.sig{display:inline-block;font-family:"Brush Script MT","STXingkai","KaiTi",cursive;font-size:20px;color:#14306b;padding:0 8px;border-bottom:1px solid #8aa}
+.form .sub th{background:#f3f6fb;font-family:var(--f-body);font-size:13px;border:1px solid #d3dae4}
+.form .sub td{font-size:13.5px}
+.wf-foot{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;padding:10px 16px;background:#f2f4f7;border-top:1px solid var(--rule)}
+.btn{font:inherit;font-size:14px;padding:6px 18px;border:1px solid #c9d2de;background:#fff;color:var(--ink);border-radius:3px;cursor:pointer}
+.btn.pri{background:var(--oa-blue);border-color:var(--oa-blue);color:#fff}
+.btn.danger{color:var(--bad);border-color:#f2b8b8}
+.btn:focus-visible{outline:2px solid var(--oa-blue-2);outline-offset:1px}
+/* 转交下一步弹窗 */
+.mask{position:absolute;inset:0;background:rgba(40,50,70,.45);display:flex;align-items:flex-start;justify-content:center;padding:28px 12px}
+.dlg{background:#fff;border-radius:4px;width:min(760px,100%);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.dlg h6{margin:0;padding:12px 18px;font-family:var(--f-form);font-size:17px;border-bottom:1px solid var(--rule)}
+.dlg .in{padding:12px 18px;display:grid;gap:10px}
+.dlg .bar{background:#f4f6f9;border:1px solid var(--rule);padding:6px 12px;font-size:13.5px}
+.dlg .bar em{font-style:normal;color:var(--form-red)}
+.dlg .steps{display:grid;grid-template-columns:200px minmax(0,1fr);border:1px solid var(--rule);font-size:13.5px}
+.dlg .steps .sl{border-right:1px solid var(--rule)}
+.dlg .steps .sl div{padding:8px 12px}
+.dlg .steps .sl .on{background:#5b7bd5;color:#fff}
+.dlg .steps .sr{padding:10px;background:#eef3fb;display:grid;gap:8px}
+.chip{display:inline-block;background:#d9e7ff;color:#1a3f8f;padding:1px 8px;border-radius:2px;margin-right:6px}
+.dlg .ft2{display:flex;justify-content:center;gap:10px;padding:12px;border-top:1px solid var(--rule)}
+/* 检验终端 / 门户卡片 */
+.pad{padding:14px;background:var(--bg)}
+.pcard{background:#fff;border-radius:6px;padding:12px 14px;margin-bottom:10px}
+.pcard h6{margin:0 0 8px;font-size:15px;font-weight:700}
+.kv{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13.5px}
+.kv span{color:var(--muted)}
+.insp td input{width:76px;font:inherit;font-family:var(--f-mono);font-size:13.5px;padding:3px 6px;border:1px solid #c9d2de;background:#fff;color:var(--ink);border-radius:3px}
+.insp td input.ng{border-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
+.insp td input.okv{border-color:var(--ok)}
+.res-ok{color:var(--ok);font-weight:700}.res-ng{color:var(--bad);font-weight:700}
+.float{border:1px solid #9fb3d1;background:#fff;width:min(250px,100%);font-size:12px;box-shadow:0 6px 18px rgba(20,50,100,.18);border-radius:4px;overflow:hidden}
+.float .fh{display:flex;justify-content:space-between;background:var(--oa-blue);color:#fff;padding:5px 8px}
+.float .fb{padding:8px;color:#29466e}
+.gantt{display:grid;grid-template-columns:170px minmax(420px,1fr);font-size:12.5px;min-width:640px;background:#fff}
+.gantt .gh{font-weight:600;background:#f3f6fb;border-bottom:1px solid var(--rule);padding:6px}
+.gantt .gl{padding:6px;border-bottom:1px solid #eef1f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gantt .gt{position:relative;border-bottom:1px solid #eef1f5;height:32px;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),#eef1f5 calc(10% - 1px) 10%)}
+.gbar{position:absolute;height:8px;border-radius:2px}
+.gbar.plan{top:6px;background:#c9d6ea}.gbar.act{top:16px}
+.gbar.g{background:var(--ok)}.gbar.y{background:var(--warn)}.gbar.r{background:var(--bad)}
+.today{position:absolute;top:0;bottom:0;width:2px;background:var(--sc)}
+.portal{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.sentence{border-left:4px solid var(--oa-blue);background:var(--oa-blue-soft);padding:8px 12px;font-size:13.5px;border-radius:3px;margin-bottom:10px}
+.bars{display:grid;gap:7px;font-size:12.5px}
+.bars div{display:grid;grid-template-columns:70px minmax(0,1fr) 30px;gap:8px;align-items:center}
+.bars i{display:block;height:10px;background:var(--oa-blue);border-radius:2px}
+.bars i.o{background:var(--sc)}
+.todo-card{border-left:3px solid var(--oa-blue);background:#fff;border-radius:3px;padding:8px 10px;font-size:13px;box-shadow:0 1px 3px rgba(20,50,100,.08)}
+.todo-card b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.todo-card .st2{display:inline-block;margin-top:4px;background:var(--oa-blue-2);color:#fff;font-size:12px;padding:0 6px;border-radius:2px}
+@media (max-width:1000px){
+  .oa-body{grid-template-columns:minmax(0,1fr)}
+  .oa-rail{display:none}
+  .oa-menu{position:static;max-height:none;border-right:none;border-bottom:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:2px;padding:8px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px))}
+  .oa-menu .grp{display:none}
+  .oa-menu a{padding:5px 10px;background:var(--soft)}
+  .oa-search{display:none}
+  .layer{grid-template-columns:minmax(0,1fr)}
+  .win-body{grid-template-columns:minmax(0,1fr)}
+  .win-menu{display:none}
+  .card{padding:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<header class="oa-top">
+  <div class="oa-logo">Office Anywhere<sup>®</sup></div>
+  <div class="oa-tabs" aria-label="页签"><span>首页</span><span>我的桌面</span><span class="on">质量管理 · 开发设计</span></div>
+  <div class="oa-search" aria-hidden="true">⌕ 搜索内容</div>
+  <div class="oa-ava" aria-label="当前用户">TDXK</div>
+</header>
+<div class="oa-body">
+<aside class="oa-rail" aria-hidden="true">
+  <i class="on"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2" fill="#1263f0"/><rect x="13" y="3" width="8" height="8" rx="2" fill="#2bb3a3"/><rect x="3" y="13" width="8" height="8" rx="2" fill="#2b86ff"/><rect x="13" y="13" width="8" height="8" rx="2" fill="#1263f0"/></svg></i>
+  <i><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4" fill="#8b98ab"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6z" fill="#8b98ab"/><circle cx="17" cy="9" r="3" fill="#b8c2d0"/></svg></i>
+  <i><svg viewBox="0 0 24 24"><path d="M3 5h13v9H8l-4 3V14H3z" fill="#8b98ab"/><path d="M9 16h7l4 3v-3h1V8h-3" fill="#b8c2d0"/></svg></i>
+  <i><svg viewBox="0 0 24 24"><path d="M3 18l5-6 4 3 7-9" stroke="#8b98ab" stroke-width="2" fill="none"/><path d="M3 21h18" stroke="#8b98ab" stroke-width="2"/></svg></i>
+  <i><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" fill="#8b98ab"/><rect x="7" y="10" width="10" height="2" fill="#fff"/><rect x="7" y="14" width="7" height="2" fill="#fff"/></svg></i>
+</aside>
+<nav class="oa-menu" aria-label="质量管理菜单">
+  <div class="grp"><b></b>快捷菜单</div>
+  <div class="grp"><b></b>流程中心</div>
+  <div class="grp open"><b></b>质量管理（QMS）</div>
+  <a class="cur" href="#home">设计总览</a>
+  <a href="#change">本版调整说明</a>
+  <a href="#arch">总体架构</a>
+  <a href="#map">31 项需求落地</a>
+  <a href="#m-doc">文档管理</a>
+  <a href="#m-prj">项目管理</a>
+  <a href="#m-cp">控制计划</a>
+  <a href="#m-insp">质检</a>
+  <a href="#m-nc">异常单</a>
+  <a href="#m-lab">实验室</a>
+  <a href="#m-ecn">变更管理</a>
+  <a href="#m-erp">ERP 对接</a>
+  <a href="#m-rpt">报表与权限</a>
+  <a href="#data">数据模型</a>
+  <a href="#proto">页面原型</a>
+  <a href="#migr">数据迁移</a>
+  <a href="#tbc">待确认项默认值</a>
+  <a href="#plan">实施计划</a>
+  <div class="grp"><b></b>应用中心</div>
+  <div class="grp"><b></b>报表中心</div>
+</nav>
+<main class="oa-main">
+<section class="card" id="home">
+  <h1 class="page-title">顺翼 QMS 开发设计 V2</h1>
+  <p class="lead">按《上海顺翼质量管理系统需求调研文档（字段级）》31 项需求调整，替代依据 10-15 调研报告的 V1 设计。底座为通达协同办公的流程中心低代码引擎与审批中心；复杂录入、计算与 ERP 集成由 QMS 扩展服务承担，页面嵌入 OA 菜单，审批进入 OA 待办。界面统一沿用通达 OA 风格。</p>
+  <div class="meta"><span>版本 <b>V2.0</b></span><span>日期 <b>2026-10-22</b></span><span>依据 <b>D01–D24</b></span><span>平台 <b>通达 OA + QMS 扩展服务 + 鼎捷 ERP</b></span></div>
+  <div class="counters">
+    <div>需求项<b>31</b></div><div>OA 原生流程<b>7</b></div><div>QMS 单据 + OA 审批<b>9</b></div><div>QMS 功能页<b>15</b></div><div>ERP 接口（必做 / 开关）<b>4 / 4</b></div><div>待确认项<b>22</b></div>
+  </div>
+</section>
+
+<section class="card">
+<h2 id="change">0　本版调整说明</h2>
+<p class="sec-intro">V1 设计把审批也放在 QMS 自建流程引擎里，OA 只做登录、消息和待办镜像。新文档明确平台为通达流程中心低代码引擎/审批中心，范围收敛为 31 项需求，并在多处改了流程节点和字段。V2 的调整如下。</p>
+<div class="tbl"><table>
+<thead><tr><th>主题</th><th>V1 设计</th><th>V2 调整</th><th>依据</th></tr></thead>
+<tbody>
+<tr><td>审批承载</td><td>QMS 自建状态机，OA 外部流程只做镜像</td><td>按需求分三种落地方式：纯审批类单据直接用<b>通达流程中心表单 + 流程</b>；明细复杂的单据用 <b>QMS 单据页 + OA 外部流程审批</b>；无审批的录入与台账用 <b>QMS 功能页</b></td><td>一、调研范围与平台</td></tr>
+<tr><td>需求范围</td><td>50 项（P1/P2/P3）</td><td>31 项需求为本期范围；报表门户、质量日报单列；SPC、警示卡并入质检</td><td>二、需求总览</td></tr>
+<tr><td>文件状态</td><td>新建中 / 现行 / 修订中 / 已作废</td><td><b>起草中 / 试产版 / 受控正式版 / 作废</b>；借阅、受控打印只能选受控正式版</td><td>3.1 表单 1</td></tr>
+<tr><td>文档流程</td><td>更改申请内含会签</td><td>拆为 6 个流程：借阅、<b>文件会签（独立）</b>、更改申请（会签最多 5 部门）、发放登记、补发、<b>受控打印（新增）</b></td><td>3.1 表单 2–7</td></tr>
+<tr><td>借阅审批</td><td>申请人 → 文控</td><td>申请人 → <b>部门主管</b> → 文控（开放阅读权限）→ 到期自动收回</td><td>3.1 表单 2</td></tr>
+<tr><td>项目管理</td><td>立项审批、延期审批</td><td>无审批；新增<b>参与人</b>、<b>节点反馈记录</b>、绿/黄/红<b>预警状态</b>；有反馈的项目只允许关闭不允许删除</td><td>3.2</td></tr>
+<tr><td>控制计划</td><td>检验类型 8 种（含 FQC、LAB、SPC）</td><td>新增列收敛为：<b>适用检验类型</b>（IQC / 首件 / 巡检 / 末件 / OQC）、<b>数据类型</b>（计量 / 计数 / 文件核对）、<b>是否 SPC</b></td><td>3.3 明细</td></tr>
+<tr><td>质检</td><td>IQC / 首巡末 / 成品 FQC / OQC 四类</td><td>IQC / IPQC / OQC 三大类共用一张检验单；成品检验并入 OQC；<b>调机次数（手检次数）</b>合为一个字段</td><td>3.4</td></tr>
+<tr><td>异常单</td><td>状态 12 个</td><td>对外状态 5 个：处理中 / 待下工站确认 / 待结案 / 已结案 / 已重新启用；新增<b>产能影响</b>、<b>关联特采单号</b>、<b>是否纳入考核</b>；处置方式增加<b>下工站确认</b></td><td>3.5</td></tr>
+<tr><td>实验室</td><td>委托 → 报告单线，报告 2/3 节点可配</td><td>两条线：<b>委托检验</b>（5 类项目，报告 3 节点：编制 → 复核 → 授权签字人）和<b>测试报告</b>（19 类项目，2 节点：测试员 → 组长）；样品领用、归还拆成两张单</td><td>3.6</td></tr>
+<tr><td>ECN</td><td>10 节点</td><td>8 节点 2 判断：发起 → 初审 → 可行性评估 → 〈需客户确认?〉→ 实施 → 〈验证?〉→ 文件更新 → 关闭；部门事项预置 <b>12 项</b>（新增控制计划更新）</td><td>3.7 流程图</td></tr>
+<tr><td>ERP</td><td>I-01～I-09 九个接口</td><td>本期必做 <b>4 个只读接口</b>（物料、供应商、客户、批次库存）；待检推送、结果回写、批次锁定、销售订单 4 个做成<b>开关</b>，确认后启用</td><td>3.8</td></tr>
+</tbody></table></div>
+</section>
+<section class="card">
+<h2 id="arch">1　总体架构</h2>
+<p class="sec-intro">用户只看到一个入口：通达 OA。审批、待办、消息、移动审批都在 OA 里；检验终端、控制计划编制、SPC、实验室数据和报表是嵌在 OA 菜单里的 QMS 页面，免登进入。</p>
+<div class="arch" role="img" aria-label="系统分层架构">
+  <div class="layer"><div class="lname">终端</div><div class="boxes">
+    <div class="box"><b>PC 客户端 / 网页端</b><small>日常录入、控制计划编制、报表</small></div>
+    <div class="box"><b>平板</b><small>巡检、首末件、拍照、扫码</small></div>
+    <div class="box"><b>通达移动端</b><small>移动审批、消息、待办</small></div>
+  </div></div>
+  <div class="layer"><div class="lname">通达 OA 底座</div><div class="boxes">
+    <div class="box oa"><b>流程中心低代码引擎</b><small>表单设计器 + 流程设计器：借阅、会签、更改、补发、受控打印、样品领用/归还</small></div>
+    <div class="box oa"><b>审批中心 / 待办</b><small>全部审批节点统一待办，移动端可批</small></div>
+    <div class="box oa"><b>组织架构</b><small>部门、人员、角色（55 人名单初始化）</small></div>
+    <div class="box oa"><b>消息中心</b><small>站内消息 + APP 推送</small></div>
+    <div class="box oa"><b>OAuth2 单点登录</b><small>QMS 页面免登</small></div>
+    <div class="box oa"><b>手写签章控件</b><small>会签、审批手写签名</small></div>
+  </div></div>
+  <div class="layer"><div class="lname">QMS 扩展服务</div><div class="boxes">
+    <div class="box qms"><b>单据服务</b><small>控制计划、检验单、异常单、ECN、实验室</small></div>
+    <div class="box qms"><b>受控文件库</b><small>版本、权限、水印、发放回收</small></div>
+    <div class="box qms"><b>计算引擎</b><small>规格拆分、判定、SPC、HV、成本</small></div>
+    <div class="box qms"><b>流程桥接</b><small>OA 流程插件回调 / 外部流程推进</small></div>
+    <div class="box qms"><b>报表与一句话结论</b></div>
+    <div class="box qms"><b>ERP 适配器</b><small>接口日志、重试、幂等</small></div>
+  </div></div>
+  <div class="layer"><div class="lname">数据</div><div class="boxes">
+    <div class="box"><b>MySQL · td_qms 库</b><small>与 OA 同实例独立库，表名 qms_模块_实体</small></div>
+    <div class="box"><b>附件存储</b><small>PDF / 图片 / Office，单个 ≤ 50 MB</small></div>
+    <div class="box ext"><b>鼎捷 ERP</b><small>中间库或 Web API（待鼎捷确认）</small></div>
+  </div></div>
+</div>
+
+<h3 id="pattern">1.1　三种落地方式</h3>
+<p>每张单据先判定落地方式。判定规则：字段平铺、无跨单据取数和计算的审批单走 P1；有明细联动、自动取数、计算或平板录入的单据走 P2；不需要审批（或只做事后审核）的录入与台账走 P3。</p>
+<div class="grid2">
+  <div class="panel"><h4><span class="tag t-p1">P1</span> OA 原生流程</h4>
+    <ul><li>表单、流程在通达流程中心用低代码配置，顺翼管理员可自行调整节点和审批人</li>
+    <li>选文件、选样品等字段用「QMS 数据选择控件」（宏控件调 QMS 接口）</li>
+    <li>流程结束或到指定节点时，<b>流程插件</b>回调 QMS 执行业务动作（开放阅读权限、升版、放行打印份数）</li>
+    <li>RUN_ID 写回 QMS 业务表，双向可查</li></ul></div>
+  <div class="panel"><h4><span class="tag t-p2">P2</span> QMS 单据页 + OA 审批</h4>
+    <ul><li>单据在 QMS 页面编辑（明细网格、自动带出、计算、校验三层）</li>
+    <li>审批节点建为 OA「外部流程」，待办出现在 OA 审批中心，点开即 QMS 办理页</li>
+    <li>QMS 校验通过才允许转交；退回到指定已办节点由 QMS 判定后调 <code>/works/back</code></li>
+    <li>节点字段权限由 QMS 控制（后端再校验）</li></ul></div>
+  <div class="panel"><h4><span class="tag t-p3">P3</span> QMS 功能页</h4>
+    <ul><li>检验录入、SPC、项目甘特图、样品台账、留样柜、报表</li>
+    <li>挂在 OA 菜单（应用中心 / 自定义菜单），从 OA 进入免登</li>
+    <li>事后审核类（检验单）在页面内完成，不进 OA 流程，避免卡 ERP 周转</li>
+    <li>提醒类消息仍走 OA 消息中心</li></ul></div>
+</div>
+
+<h3 id="oa">1.2　通达 OA 底座集成点</h3>
+<div class="tbl"><table>
+<thead><tr><th>能力</th><th>做法</th><th>通达接口 / 配置</th></tr></thead>
+<tbody>
+<tr><td>单点登录</td><td>OA 菜单链接到 QMS <code>/api/auth/oa/login</code>；已登录 OA 时授权页直接回调，QMS 签发会话令牌</td><td><code>/oauth2/authorize</code> → <code>/oauth2/token</code> → <code>/oauth2/userinfo</code></td></tr>
+<tr><td>组织同步</td><td>每日同步部门、人员、角色；离职人员待办按岗位转给新任职人并留痕</td><td><code>/directory/searchdepartments</code>、<code>/directory/departmentrecipients</code>、<code>/directory/rolerecipients</code></td></tr>
+<tr><td>P1 流程回调</td><td>OA 流程插件在节点转交 / 流程结束时 POST 到 QMS，携带 RUN_ID 与表单数据；QMS 幂等处理</td><td>流程设计器「流程插件」+ QMS <code>/api/oa/hook/{biz}</code></td></tr>
+<tr><td>P2 审批</td><td>QMS 提交即建外部流程实例，校验通过后转交，退回调用退回接口</td><td><code>/works/new</code>、<code>/works/turn</code>、<code>/works/backnodes</code>、<code>/works/back</code></td></tr>
+<tr><td>消息</td><td>待办、临期、逾期、结案、变更关闭推送 OA 消息与移动端；同人同单同事件 30 分钟内只发一条；22:00–7:00 不推 APP（SPC 准则 1、检验不合格除外）</td><td>OA 站内消息接口（需厂商开放，见第 7 章）</td></tr>
+<tr><td>手写签名</td><td>P1 单据用 OA 手写签章控件；P2 单据用 QMS 签名板（平板 / 手机），签名图片 + 时间戳 + IP + 设备入库</td><td>通达表单手写签章控件</td></tr>
+</tbody></table></div>
+<div class="callout"><b>外部流程限制：</b>通达 <code>/works/*</code> 接口只能操作在流程设计中标记为「外部流程」的流程（否则返回 -999）。P2 的 7 个流程（控制计划、异常单、ECN、委托合同、原始记录、委托报告、测试报告）须在 OA 中按此配置。</div>
+</section>
+<section class="card">
+<h2 id="map">2　31 项需求落地映射</h2>
+<p class="sec-intro">序号与需求调研文档第二章一致。<span class="tag t-p1">P1</span> OA 原生流程，<span class="tag t-p2">P2</span> QMS 单据页 + OA 审批，<span class="tag t-p3">P3</span> QMS 功能页。</p>
+<div class="tbl"><table>
+<thead><tr><th class="num">#</th><th>模块</th><th>需求点</th><th>落地</th><th>流程 / 审批</th><th>QMS 页面</th><th>主要数据表</th><th>资料</th></tr></thead>
+<tbody>
+<tr><td class="num">1</td><td>文档</td><td>文档借阅，审批后开放阅读、到期收回</td><td><span class="tag t-p1">P1</span></td><td>申请人 → 部门主管 → 文控</td><td>我的借阅、借阅汇总</td><td><code>qms_doc_borrow</code></td><td><span class="tag t-ok">已有</span></td></tr>
+<tr><td class="num">2</td><td>文档</td><td>文件会签，通过后自动归档，手写签名</td><td><span class="tag t-p1">P1</span></td><td>起草人 → 并行会签 → 审核 → 批准</td><td>会签汇总表</td><td><code>qms_doc_sign</code> / <code>_sign_dept</code></td><td><span class="tag t-ok">已有</span></td></tr>
+<tr><td class="num">3</td><td>文档</td><td>文件变更：选文档 → 上传新版 → 审批后换版</td><td><span class="tag t-p1">P1</span></td><td>申请者 → 部门意见 → 会签(≤5) → 审核 → 核准</td><td>文件库详情</td><td><code>qms_doc_dcr</code></td><td><span class="tag t-ok">已有</span></td></tr>
+<tr><td class="num">4</td><td>文档</td><td>文件发放：线下领取，含回收</td><td><span class="tag t-p3">P3</span></td><td>文控登记，接收人回签</td><td>发放与回收记录</td><td><code>qms_doc_dist</code> / <code>_item</code> / <code>_recall</code></td><td><span class="tag t-ok">已有</span></td></tr>
+<tr><td class="num">5</td><td>文档</td><td>受控打印覆盖水印</td><td><span class="tag t-p1">P1</span>+<span class="tag t-p3">P3</span></td><td>申请人 → 部门主管 → 文控；按份数放行</td><td>受控打印台</td><td><code>qms_doc_print</code> / <code>_print_log</code></td><td><span class="tag t-bad">缺失</span></td></tr>
+<tr><td class="num">6</td><td>项目</td><td>项目台账</td><td><span class="tag t-p3">P3</span></td><td>无</td><td>项目列表、项目详情</td><td><code>qms_prj_main</code></td><td><span class="tag t-warn">缺节点清单</span></td></tr>
+<tr><td class="num">7</td><td>项目</td><td>节点分发，责任人加参与人</td><td><span class="tag t-p3">P3</span></td><td>无</td><td>WBS 任务表</td><td><code>qms_prj_task</code> / <code>_member</code></td><td><span class="tag t-bad">缺失</span></td></tr>
+<tr><td class="num">8</td><td>项目</td><td>节点反馈、附件、状态</td><td><span class="tag t-p3">P3</span></td><td>无</td><td>我的节点、反馈</td><td><code>qms_prj_feedback</code></td><td><span class="tag t-bad">缺失</span></td></tr>
+<tr><td class="num">9</td><td>项目</td><td>逾期预警（颜色 + 消息）</td><td><span class="tag t-p3">P3</span></td><td>定时任务</td><td>预警着色</td><td>计算字段</td><td><span class="tag t-bad">缺失</span></td></tr>
+<tr><td class="num">10</td><td>项目</td><td>甘特图</td><td><span class="tag t-p3">P3</span></td><td>无</td><td>甘特图</td><td>—</td><td><span class="tag t-bad">缺失</span></td></tr>
+<tr><td class="num">11</td><td>控制计划</td><td>在线编制，发行后生成检验模板</td><td><span class="tag t-p2">P2</span></td><td>编制 → 一级审核 → 二级批准 → 发行</td><td>控制计划编制网格</td><td><code>qms_cp_*</code></td><td><span class="tag t-ok">已有</span></td></tr>
+<tr><td class="num">12</td><td>质检</td><td>IQC 检验</td><td><span class="tag t-p3">P3</span></td><td>录入 → 判定即回写 → 事后审核</td><td>待检看板、检验单</td><td><code>qms_insp_*</code></td><td><span class="tag t-warn">缺终端截图</span></td></tr>
+<tr><td class="num">13</td><td>质检</td><td>IPQC 首/巡/末，含调机次数</td><td><span class="tag t-p3">P3</span></td><td>同上</td><td>平板检验终端</td><td><code>qms_insp_*</code></td><td><span class="tag t-warn">缺终端截图</span></td></tr>
+<tr><td class="num">14</td><td>质检</td><td>OQC 成品检验</td><td><span class="tag t-p3">P3</span></td><td>录入 → 审核</td><td>OQC 检验单（含自动抓取区）</td><td><code>qms_insp_*</code>、<code>qms_insp_fetch</code></td><td><span class="tag t-warn">缺终端截图</span></td></tr>
+<tr><td class="num">15</td><td>质检</td><td>按客户模板生成出货报告（合格章）</td><td><span class="tag t-p3">P3</span></td><td>OQC 组长确认后盖章</td><td>出货报告、客户模板配置</td><td><code>qms_oqc_report</code>、<code>qms_oqc_cust_tpl</code></td><td><span class="tag t-ok">23 份模板</span></td></tr>
+<tr><td class="num">16</td><td>异常单</td><td>不合格自动 / 手工创建</td><td><span class="tag t-p2">P2</span></td><td>见 3.5 流程</td><td>异常单办理</td><td><code>qms_nc_*</code></td><td><span class="tag t-ok">已有</span></td></tr>
+<tr><td class="num">17</td><td>异常单</td><td>关联订单 / 批次 / 特采，成本核算</td><td><span class="tag t-p2">P2</span></td><td>同上</td><td>成本页签</td><td><code>qms_nc_cost</code></td><td><span class="tag t-warn">数据来源待确认</span></td></tr>
+<tr><td class="num">18</td><td>实验室</td><td>委托检验合同</td><td><span class="tag t-p2">P2</span></td><td>业务接待 → 委托人确认 → 组长承接分配</td><td>委托单</td><td><code>qms_lab_contract</code></td><td><span class="tag t-ok">已有</span></td></tr>
+<tr><td class="num">19</td><td>实验室</td><td>原始记录（需审批）</td><td><span class="tag t-p2">P2</span></td><td>检测员 → 复核员</td><td>原始记录录入</td><td><code>qms_lab_raw*</code></td><td><span class="tag t-warn">仅 1 类</span></td></tr>
+<tr><td class="num">20</td><td>实验室</td><td>委托报告取数于合同 + 原始记录</td><td><span class="tag t-p2">P2</span></td><td>编制 → 复核 → 授权签字人（3 节点）</td><td>报告编辑 / 审批</td><td><code>qms_lab_report</code></td><td><span class="tag t-warn">部分</span></td></tr>
+<tr><td class="num">21</td><td>实验室</td><td>客户样品录入与编号</td><td><span class="tag t-p3">P3</span></td><td>无</td><td>样品台账</td><td><code>qms_lab_sample</code></td><td><span class="tag t-ok">已有</span></td></tr>
+<tr><td class="num">22</td><td>实验室</td><td>样品领用申请</td><td><span class="tag t-p1">P1</span></td><td>申请人 → 样品管理员</td><td>—</td><td><code>qms_lab_loan</code></td><td><span class="tag t-bad">缺失</span></td></tr>
+<tr><td class="num">23</td><td>实验室</td><td>样品归还申请</td><td><span class="tag t-p1">P1</span></td><td>申请人 → 样品管理员</td><td>—</td><td><code>qms_lab_return</code></td><td><span class="tag t-bad">缺失</span></td></tr>
+<tr><td class="num">24</td><td>实验室</td><td>测试数据填报（19 类）</td><td><span class="tag t-p3">P3</span></td><td>无</td><td>测试数据录入</td><td><code>qms_lab_test</code> / <code>_data</code></td><td><span class="tag t-warn">部分</span></td></tr>
+<tr><td class="num">25</td><td>实验室</td><td>测试报告（19 类，合格章）</td><td><span class="tag t-p2">P2</span></td><td>测试员 → 组长（2 节点）</td><td>报告预览 / 审批</td><td><code>qms_lab_report</code></td><td><span class="tag t-warn">缺 5 类模板</span></td></tr>
+<tr><td class="num">26</td><td>实验室</td><td>留样柜台账</td><td><span class="tag t-p3">P3</span></td><td>无（两组共同维护）</td><td>留样柜目录</td><td><code>qms_lab_retain</code></td><td><span class="tag t-ok">已有</span></td></tr>
+<tr><td class="num">27</td><td>变更</td><td>ECN 全流程</td><td><span class="tag t-p2">P2</span></td><td>8 节点 2 判断，A/B/C 分级</td><td>ECN 办理、变更记录一览表</td><td><code>qms_ecn_*</code></td><td><span class="tag t-ok">已有</span></td></tr>
+<tr><td class="num">28</td><td>ERP</td><td>库存（含批次）</td><td>接口</td><td>实时查询</td><td>—</td><td>不落库</td><td><span class="tag t-mute">待接口文档</span></td></tr>
+<tr><td class="num">29</td><td>ERP</td><td>供应商</td><td>接口</td><td>每日增量</td><td>—</td><td><code>qms_base_supplier</code></td><td><span class="tag t-mute">待接口文档</span></td></tr>
+<tr><td class="num">30</td><td>ERP</td><td>客户</td><td>接口</td><td>每日增量</td><td>—</td><td><code>qms_base_customer</code></td><td><span class="tag t-mute">待接口文档</span></td></tr>
+<tr><td class="num">31</td><td>ERP</td><td>物料</td><td>接口</td><td>每日增量</td><td>—</td><td><code>qms_base_part</code></td><td><span class="tag t-mute">待接口文档</span></td></tr>
+</tbody></table></div>
+<p>统计：<span class="tag t-p1">P1</span> 7 项（1、2、3、5、22、23 及 5 的申请部分），<span class="tag t-p2">P2</span> 9 项，<span class="tag t-p3">P3</span> 15 项（含 5 的打印放行），ERP 4 项。</p>
+</section>
+<section class="card">
+<h2 id="m-doc">3.1　文档管理</h2>
+<p class="sec-intro">以受控文件库为核心，6 个流程都围绕库内文件运转。上线前批量导入现行受控文件约 1,400 条（程序文件约 33、作业指导书 386、包装规范 750、表单 223，另三级文件分类页 468 条去重后并入）。</p>
+
+<h4>文件状态</h4>
+<div class="states">
+  <span class="st">DRAFTING<em>起草中</em></span><span class="arr">→</span>
+  <span class="st">TRIAL<em>试产版</em></span><span class="arr">→</span>
+  <span class="st">RELEASED<em>受控正式版</em></span><span class="arr">→</span>
+  <span class="st">OBSOLETE<em>作废</em></span>
+</div>
+<p>新文件经会签或更改申请核准后进入受控正式版（图面、控制计划在 ECN 试产阶段先为试产版）。同一文件编号同时只有一个受控正式版；升版时旧版转作废并触发回收。版本、状态、发布日期只能由流程回调改写，导入初始化除外。</p>
+
+<h4>六个流程</h4>
+<div class="flow" aria-label="借阅流程"><span class="node">申请人<small>选受控正式版，可多份</small></span><span class="arr">→</span><span class="node">部门主管</span><span class="arr">→</span><span class="node">文控<small>开放阅读权限</small></span><span class="arr">→</span><span class="node end">到期自动收回<small>写实际归还日期</small></span></div>
+<p class="flow-note">① 借阅 <span class="tag t-p1">P1</span>　电子借阅只给在线阅览权（禁止下载、打印）；纸质借阅由文控确认归还。到期前 1 天提醒，逾期抄送文控。</p>
+<div class="flow" aria-label="会签流程"><span class="node">起草人<small>新制定 / 修订，上传附件</small></span><span class="arr">→</span><span class="node">并行会签<small>指定部门，手写签名</small></span><span class="arr">→</span><span class="node">审核</span><span class="arr">→</span><span class="node">批准</span><span class="arr">→</span><span class="node end">自动归档<small>入库 + 写制修订记录</small></span></div>
+<p class="flow-note">② 文件会签 <span class="tag t-p1">P1</span>　收件日期 = 到达会签节点时间，会签日期 = 提交时间；<b>任一部门不同意</b>退回起草人。归档时插件回调 QMS：文件状态置受控正式版、版本 +1、写 SYFM0310 一行、按发放范围生成发放记录。</p>
+<div class="flow" aria-label="更改申请流程"><span class="node">申请者<small>选库内文件，上传变更后文件</small></span><span class="arr">→</span><span class="node">变更部门意见</span><span class="arr">→</span><span class="node">会签<small>申请人指定，最多 5 部门</small></span><span class="arr">→</span><span class="node">审核</span><span class="arr">→</span><span class="node">核准</span><span class="arr">→</span><span class="node end">换版<small>版本 +1，旧版作废，发放与回收</small></span></div>
+<p class="flow-note">③ 更改申请 <span class="tag t-p1">P1</span>　ECN「文件更新」事项自动生成更改申请草稿并带出 ECN 单号；全部关联文件换版后 ECN 才能关闭。会签部门超过 5 个时表单校验拦截。</p>
+<div class="flow" aria-label="发放登记"><span class="node">文控登记发放<small>类别、编号、版次、首次与否</small></span><span class="arr">→</span><span class="node">接收人签收<small>电子回签 / 纸质签名</small></span><span class="arr">→</span><span class="node dec">非首次?</span><span class="arr">→</span><span class="node end">回收旧版<small>回收份数 = 发放份数才完成</small></span></div>
+<p class="flow-note">④ 发放登记 <span class="tag t-p3">P3</span>　图面规则：电子档发物控、品质、采购，纸质档发生产（生计部、物控）；变更回收时电子档由工程回收（系统自动收回权限），纸质档由接收部门交回。</p>
+<div class="flow" aria-label="补发流程"><span class="node">申请人</span><span class="arr">→</span><span class="node">申请单位主管</span><span class="arr">→</span><span class="node">文控中心</span><span class="arr">→</span><span class="node end">责任单位</span></div>
+<p class="flow-note">⑤ 补发 <span class="tag t-p1">P1</span>　申请张数同时作为受控打印份数上限；文控通过后生成纸质发放行（分发编号新增）。</p>
+<div class="flow" aria-label="受控打印"><span class="node">申请人<small>文件、份数、使用地点</small></span><span class="arr">→</span><span class="node">部门主管</span><span class="arr">→</span><span class="node">文控</span><span class="arr">→</span><span class="node end">QMS 打印台放行<small>按份数，逐份带分发编号</small></span></div>
+<p class="flow-note">⑥ 受控打印 <span class="tag t-p1">P1</span>+<span class="tag t-p3">P3</span>　打印在 QMS 生成带水印 PDF：「受控文件 + 分发编号 + 打印人 + 打印时间」；用满份数后按钮失效，须重新申请。打印记录用于回收核对。<span class="tag t-warn">无现成表单，建议字段待确认</span></p>
+
+<h4>数据表</h4>
+<div class="tbl"><table>
+<thead><tr><th>表</th><th>对应表单</th><th>关键字段</th><th>约束</th></tr></thead>
+<tbody>
+<tr><td><code>qms_doc_file</code></td><td>受控文件台账 SYFM0301</td><td>file_no、file_name、file_level（QM/QP/WI/FM/DWG/EXT/OTHER）、parent_file_id、rev、owner_dept_id、<span class="tag t-new">rel_cust_codes / rel_part_nos</span>、status、publish_date、implement_date、att_id、<span class="tag t-new">read_scope</span>（人员/部门）</td><td>file_no 唯一；包装规范、图面按料号归类时料号必填</td></tr>
+<tr><td><code>qms_doc_version</code></td><td>制修订记录 SYFM0310</td><td>file_id、rev、change_content、reviser/日期、auditor/日期、approver/日期、src_type（SIGN/DCR/IMPORT）、src_run_id</td><td>file_id + rev</td></tr>
+<tr><td><code>qms_doc_borrow</code> / <code>_item</code></td><td>借阅 SYFM0306</td><td>borrow_no（建议 JY+年月日+流水）、dept、borrower、borrow_date、plan_return_date、borrow_mode、<span class="tag t-new">reason</span>、actual_return_date、run_id</td><td>plan_return_date ≥ borrow_date；仅选受控正式版</td></tr>
+<tr><td><code>qms_doc_sign</code> / <code>_sign_dept</code></td><td>会签单 SYFM0309</td><td>category、sign_type（新制定/修订）、name、file_no、draft_rev、att_id、change_summary、effective_date；明细：dept、receive_at、sign_at、signer、opinion、sig_img、confirm_date</td><td>一张会签单对应一个文件版次</td></tr>
+<tr><td><code>qms_doc_dcr</code></td><td>更改申请 SYFM0304</td><td>dcr_no、file_id、cur_rev、apply_dept、applicant、before_text、after_text、reason、new_att_id、ecn_id、dept_opinion、sign_depts（≤5，含结论）、audit/approve 意见与签名</td><td>同一文件同时只能有一张在途申请</td></tr>
+<tr><td><code>qms_doc_dist</code> / <code>_item</code> / <code>_recall</code></td><td>发放登记 SYFM0303</td><td>dist_category、doc_no、rev、release_date、first_issue；明细 dept、receiver、copies、media（纸质/电子）、receive_date、copy_no；回收 rev、recall_copies、recall_by、recall_at</td><td>非首次时回收明细必填</td></tr>
+<tr><td><code>qms_doc_reissue</code></td><td>补发 SYFM0305</td><td>apply_type（图面/文件/其他）、model/part_no/part_name、file_no/rev/name、other_desc、copies、paper_size、need_date、reason</td><td>按类型条件必填</td></tr>
+<tr><td><code>qms_doc_print</code> / <code>_print_log</code> <span class="tag t-new">新增</span></td><td>受控打印申请</td><td>files（多选）、copies、use_place、reason、copy_nos；打印记录 printer、printed_at、copies、recall_status</td><td>已打印份数 ≤ 批准份数</td></tr>
+<tr><td><code>qms_doc_drawing</code> / <code>_ack</code></td><td>图纸档案与推送回签</td><td>drawing_no、part_no、cust_part_no、drawing_type、cust_rev、sy_rev、status（试产版/受控正式版/作废）、ecn_id；回签 dept、receiver、ack_at</td><td>同料号同类型同版本唯一</td></tr>
+</tbody></table></div>
+</section>
+<section class="card">
+<h2 id="m-prj">3.2　项目管理</h2>
+<p class="sec-intro">无审批，全部 <span class="tag t-p3">P3</span>。节点清单待樊伟提供，先按 APQP 五阶段（SY/QP12、SY/QP13）建默认模板，新建项目套用后可增删。</p>
+<div class="grid2">
+  <div class="panel"><h4>规则</h4><ul>
+    <li>已有反馈的项目只允许关闭，不允许删除</li>
+    <li>两级 WBS；责任人可自行添加参与人</li>
+    <li>只有责任人与参与人可反馈；节点设了交付物时，标记完成前必须上传附件</li>
+    <li>项目进度 = 已完成节点数 ÷ 节点总数（权重口径待确认，预留 weight 字段）</li>
+    <li>前置节点未完成时「开始」给出提示，是否硬卡控做成开关（默认提示不卡）</li></ul></div>
+  <div class="panel"><h4>预警（定时任务每日 8:00）</h4><ul>
+    <li><span class="tag t-ok">正常</span> 距计划完成 &gt; N 天</li>
+    <li><span class="tag t-warn">临期</span> 距计划完成 ≤ N 天（N 默认 3，可配），推送责任人</li>
+    <li><span class="tag t-bad">逾期</span> 未完成且今天 &gt; 计划完成，逾期当天起每天推送责任人与项目经理</li>
+    <li>暂停的项目不预警</li></ul></div>
+</div>
+<div class="states"><span class="st">NOT_STARTED<em>未启动</em></span><span class="st">IN_PROGRESS<em>进行中</em></span><span class="st">DONE<em>已完成</em></span><span class="st">CLOSED<em>已关闭</em></span><span class="st">PAUSED<em>已暂停</em></span></div>
+<div class="tbl"><table>
+<thead><tr><th>表</th><th>关键字段</th></tr></thead>
+<tbody>
+<tr><td><code>qms_prj_main</code></td><td>prj_no、prj_name、prj_type（新品开发/工程变更/改善/其他）、cust_code、cust_part_no/part_no/spec、pm、plan_start/plan_end、actual_end、tpl_id、status、progress、description、att</td></tr>
+<tr><td><code>qms_prj_member</code></td><td>prj_id、user_id、role（业务/工程/生产/品质/采购，参考控制计划核心小组）</td></tr>
+<tr><td><code>qms_prj_task</code></td><td>seq、parent_id、task_name、owner、<span class="tag t-new">participants</span>、plan_start/plan_end、pre_task_ids、deliverable_req、status（未开始/进行中/已完成/已暂停）、actual_start/actual_end、warn_level（计算）、weight</td></tr>
+<tr><td><code>qms_prj_feedback</code> <span class="tag t-new">新增</span></td><td>task_id、user_id、fb_at、content、percent（0–100）、att_ids、new_status</td></tr>
+<tr><td><code>qms_prj_tpl</code> / <code>_tpl_task</code></td><td>prj_type、节点名、阶段、默认岗位、默认工期、前置、交付物要求</td></tr>
+</tbody></table></div>
+</section>
+<section class="card">
+<h2 id="m-cp">3.3　控制计划</h2>
+<p class="sec-intro"><span class="tag t-p2">P2</span>　版式与现行《控制计划.xlsx》一致，字段编号 ①–㉩ 按「填写说明」；以 A043-S005365 已发行控制计划 PDF 为样例核对。控制计划是质检的数据源。</p>
+<div class="flow" aria-label="控制计划审批"><span class="node">编制人<small>工程部，在线编制或 Excel 导入</small></span><span class="arr">→</span><span class="node">一级审核</span><span class="arr">→</span><span class="node">二级批准<small>写入 ⑧ 工厂批准</small></span><span class="arr">→</span><span class="node end">发行<small>生成检验模板 + 归档文件库 + 推送品质部</small></span></div>
+<p class="flow-note">各级可驳回至编制人。修订只能由 ECN 或文件更改申请触发（设计/过程/设备/材料变更、不合格重复发生），升版后旧版检验模板失效，在途检验单仍按生成时版本完成。</p>
+
+<h4>明细新增列与模板生成</h4>
+<div class="tbl"><table>
+<thead><tr><th>新增列</th><th>取值</th><th>用途</th></tr></thead>
+<tbody>
+<tr><td>适用检验类型</td><td>IQC / IPQC-首件 / IPQC-巡检 / IPQC-末件 / OQC（多选）</td><td>发行时按勾选拆出检验模板，替代从「控制方法」文字识别；导入历史控制计划时按关键词给建议勾选，编制人确认</td></tr>
+<tr><td>数据类型</td><td>计量（录实测值）/ 计数（OK/NG）/ 文件核对（上传附件）</td><td>决定检验明细录入控件与判定方式</td></tr>
+<tr><td>是否 SPC</td><td>是 / 否</td><td>是则实测值自动落入 SPC 子组；子组大小、频次取巡检栏</td></tr>
+</tbody></table></div>
+<p>㉴ 规范/公差拆为「规范描述 + 标称值 / USL / LSL / 单位」，录入时实时拆分预览：<code>Ø15.80±0.03</code> → 15.77 / 15.83；<code>8～12 μm</code> → 8 / 12；<code>≥175 MPa</code> → 下限 175；「无裂纹」→ 计数。「全尺寸」行展开为尺寸子行（D1 杆径、L1 总长、H1 头高…），继承父行样本量与频次。</p>
+<div class="callout"><b>提交前校验（填写说明）：</b>生产工序过程特性不可空；规范不能只写「按图纸」；勾选首/巡/末/IQC/OQC 的行样本量与频次必填；SC/CC 行至少勾选一种记录型检验；热处理、电镀设备列须标 CQI-9 / CQI-11；同一料号同一阶段只有一份已发行版本。</div>
+<h4>下拉项初稿（Q2，待顺翼补全）</h4>
+<div class="tbl"><table>
+<thead><tr><th>字段</th><th>选项（取自样例）</th></tr></thead>
+<tbody>
+<tr><td>⑭ 过程编号 / ⑮ 过程名称</td><td>10 材料进料检验 / 20 冷镦成型 / 30 CNC 车削 / 40 搓牙 / 50 热处理 / 60 电镀</td></tr>
+<tr><td>㉵ 测量技术</td><td>目视、卡尺、千分尺、影像仪、螺纹通止规、三针、洛氏硬度计、维氏硬度计、金相显微镜、盐雾试验箱、膜厚仪、扭力试验机、敲击试验机、万能拉力试验机、文件核对</td></tr>
+<tr><td>首件 / 末件频次</td><td>开班/换模、开班/换刀、开班/开炉、开班/换槽、开班/变更；班末/换模、班末/换刀、班末/换槽</td></tr>
+<tr><td>㉶ 巡检样本 / 频次</td><td>按AQL、3、4、5、30；每批、每批/每炉、每1小时、每2小时、每炉、每批/每周、每年/每批、变更时</td></tr>
+<tr><td>㉷ 控制方法</td><td>COC核对+进料抽检、首末件全尺寸+巡检、首末件全尺寸+SPC巡检、炉温曲线连续监控、盐雾试验报告</td></tr>
+<tr><td>㉸ 反应计划</td><td>退货/挑选、隔离/调模、隔离/调机、返修/隔离、隔离/评审、整批扣留/评审、隔离/返工</td></tr>
+<tr><td>㉹ 责任岗位</td><td>IQC、QC、班组长、热处理班长、电镀班长</td></tr>
+</tbody></table></div>
+<p>数据表：<code>qms_cp_main</code>（表头 ①–⑬，支持多料号）、<code>qms_cp_team</code>（核心小组，电话从人员库带出）、<code>qms_cp_item</code>（⑭–㉩ + 3 个新增列）、<code>qms_cp_item_dim</code>（尺寸子行）、<code>qms_cp_tpl</code> / <code>_tpl_item</code>（发行时生成，ACTIVE / FROZEN）。</p>
+</section>
+<section class="card">
+<h2 id="m-insp">3.4　质检（IQC / IPQC / OQC）</h2>
+<p class="sec-intro"><span class="tag t-p3">P3</span>　三类检验共用一张检验单结构，明细从已发行控制计划自动带出，一屏批量录入。审核为事后审核，不卡 ERP 工序周转。</p>
+<div class="tbl"><table>
+<thead><tr><th>大类</th><th>子类</th><th>触发</th><th>取数范围</th></tr></thead>
+<tbody>
+<tr><td>IQC 进料</td><td>原材料 / 外购件 / 委外加工</td><td>ERP 到货推送自动生成（接口 #5 开关），或手工创建</td><td>控制计划勾选 IQC 的特性（通常过程号 10）</td></tr>
+<tr><td>IPQC 过程</td><td>首件 / 巡检 / 末件</td><td>开班、换模、换刀、换批、换槽、开炉、变更；扫机台二维码进入；巡检按频次生成待检任务</td><td>对应过程号（20–60）的首件 / 巡检 / 末件栏</td></tr>
+<tr><td>OQC 出货</td><td>成品出货检验</td><td>出货前按批次生成</td><td>勾选 OQC 的特性 + 自动抓取同批次 IQC、IPQC 首件、SPC、实验室数据</td></tr>
+</tbody></table></div>
+<div class="flow" aria-label="检验流程"><span class="node">打开 / 扫码<small>自动弹出过往不良警示卡</small></span><span class="arr">→</span><span class="node">逐项录入 S1…Sn<small>计量自动判定，超限标红</small></span><span class="arr">→</span><span class="node dec">综合判定</span><span class="arr">→</span><span class="node">回写 ERP<small>接口 #6 开关</small></span><span class="arr">→</span><span class="node end">组长事后审核</span></div>
+<p class="flow-note">任一项 NG → 综合判定不合格，可一键生成异常单（带入不合格项与实测值）；<b>首件调机次数 = 1 且合格</b>计入首件一次合格率。处置结果由异常单回写（合格 / 特采 / 退货 / 挑选 / 返工 / 报废）。</p>
+
+<h4>检验单主表关键字段</h4>
+<div class="tbl"><table>
+<thead><tr><th>字段</th><th>适用</th><th>来源</th><th>规则</th></tr></thead>
+<tbody>
+<tr><td>检验类型 / 子类、创建方式</td><td>全部</td><td>系统</td><td>自动（控制计划/ERP）/ 手工</td></tr>
+<tr><td>首件触发原因</td><td>IPQC 首/末</td><td>手工</td><td>开班 / 换模 / 换刀 / 换批 / 换槽 / 开炉 / 变更</td></tr>
+<tr><td>控制计划编号 / 版本</td><td>全部</td><td>控制计划</td><td>只取已发行版本；自动创建时必填</td></tr>
+<tr><td>客户、顺翼料号 / 客户料号 / 品名规格、图号 / 图纸版本</td><td>全部</td><td>ERP / 文件库</td><td>图纸悬浮窗；另可查控制计划、工艺图、警示卡</td></tr>
+<tr><td>批次号</td><td>全部</td><td>ERP</td><td>如 510120260626001，追溯主键</td></tr>
+<tr><td>炉批号 / 材质牌号、供应商 / 委外厂商</td><td>IQC</td><td>ERP / 手工</td><td>原材料必填</td></tr>
+<tr><td>到货单号 / 订单号 / 送货单号</td><td>IQC / OQC</td><td>ERP</td><td>OQC 出货报告需订单号、送货单号</td></tr>
+<tr><td>工序、设备 / 机台编号</td><td>IPQC</td><td>控制计划 / 手工</td><td>同设备默认带出上次值（开关，R 问题点）</td></tr>
+<tr><td>首件状态：人 / 机 / 料 / 法</td><td>IPQC 首件</td><td>手工</td><td>操作员、机台、材料批次、工艺/程序版本；同批次唯一</td></tr>
+<tr><td>调机次数（手检次数）</td><td>IPQC 首件</td><td>手工</td><td>≥ 1；重检自动 +1</td></tr>
+<tr><td>批量、抽检数量</td><td>全部</td><td>ERP / 系统</td><td>按控制计划样本量；「按AQL」时查 AQL 表（标准待提供），可增不可减</td></tr>
+<tr><td>表面处理 / 材质、是否环保 HSF</td><td>OQC</td><td>ERP / 手工</td><td>出货报告表头</td></tr>
+<tr><td>综合判定、处置结果</td><td>全部</td><td>系统 / 异常单回写</td><td>任一项 NG 即不合格</td></tr>
+<tr><td>附件（COC、ROHS、照片）</td><td>全部</td><td>手工</td><td>NG 行建议拍照</td></tr>
+<tr><td>审核人 / 审核时间</td><td>全部</td><td>页面内</td><td>事后审核，不卡周转</td></tr>
+</tbody></table></div>
+
+<h4>出货检验报告、警示卡、SPC</h4>
+<div class="grid2">
+  <div class="panel"><h4>出货报告</h4><ul>
+    <li>顺翼版 SYFM2001 + 23 份客户模板（A002、A020、A036、A036-5 GP12、A054、B043、B048、B087、C012、C017、C032、C035、C036、C040、C058、E001、E017、E035、E040、E047、F009、F010）</li>
+    <li>按客户代码配置模板与字段映射；差异字段：中英双语、产品状态（T0–Tn/首件/首批/批量）、模腔数、车型/项目、文件检查项、样本数 5–10</li>
+    <li>OQC 组长确认后加盖质量合格章；按批次随附材质证明、盐雾、去氢曲线、氢脆、SPC</li>
+    <li>OA 直发客户邮箱做成开关（R4）</li></ul></div>
+  <div class="panel"><h4>产品过往不良警示卡</h4><ul>
+    <li>按料号一卡，开检验单时自动弹出，异常单处理中可查阅</li>
+    <li>字段：客户/料号/规格、序号（每页 8 行）、缺陷等级、不良类别（客诉/制程内）、问题描述、后果影响、发生日期、图示、备注、文件编号/版本</li>
+    <li>异常单结案时一键追加并升版，作为受控文件（SY/WI…）入库</li></ul></div>
+  <div class="panel"><h4>SPC X̄-R</h4><ul>
+    <li>表头全部从控制计划与检验单带出；数据来自标记 SPC 的巡检 / 进料实测值，n=5，25 组 125 个</li>
+    <li>A2=0.577、D4=2.114、D3=0、d2=2.326；±1σ/±2σ 分区；休哈特 8 项判异</li>
+    <li>稳定才报 Cp/Cpk（目标 ≥ 1.33），否则只报 Pp/Ppk；判异触发 OCAP，可生成异常单</li></ul></div>
+</div>
+<p>数据表：<code>qms_insp_task</code>、<code>qms_insp_main</code>、<code>qms_insp_item</code>、<code>qms_insp_value</code>、<code>qms_insp_fetch</code>（OQC 抓取快照）、<code>qms_oqc_report</code> / <code>_cust_tpl</code> / <code>_send_log</code>、<code>qms_warn_card</code> / <code>_item</code>、<code>qms_spc_chart</code> / <code>_subgroup</code> / <code>_limit</code> / <code>_alarm</code>。</p>
+</section>
+<section class="card">
+<h2 id="m-nc">3.5　异常单</h2>
+<p class="sec-intro"><span class="tag t-p2">P2</span>　以 SYFM2302 六个栏目为骨架，补充问题点提出的驳回、下工站确认、批次 / 订单 / 特采关联和成本核算，并参考客户「不合格品评审单」（D13）的金额升级、产能影响和审批记录栏。</p>
+<div class="flow" aria-label="异常单流程">
+  <span class="node">发起<small>检验单 NG 自动 / 手工</small></span><span class="arr">→</span>
+  <span class="node">品质判定<small>类型、处置方式、会签部门</small></span><span class="arr">→</span>
+  <span class="node">会签<small>24 h，计划完成日期、产能影响</small></span><span class="arr">→</span>
+  <span class="node dec">内部 / 供应商?</span><span class="arr">→</span>
+  <span class="node">原因分析 · 改善措施<small>内部：责任部门</small></span><span class="arr">/</span>
+  <span class="node">SQE 处理 → 反馈供应商<small>外部，不另生成 4D</small></span><span class="arr">→</span>
+  <span class="node">实物处置<small>可分次录入全检不良数</small></span><span class="arr">→</span>
+  <span class="node opt">下工站确认<small>可多次追加</small></span><span class="arr">→</span>
+  <span class="node">结果确认<small>项目 QE 跟踪验证</small></span><span class="arr">→</span>
+  <span class="node">品质部审批</span><span class="arr">→</span>
+  <span class="node dec">损失 &gt; 3,000 元 / 批量报废 / 意见冲突?</span><span class="arr">→</span>
+  <span class="node opt">总经理</span><span class="arr">→</span>
+  <span class="node end">结案<small>通知发起人，可追加警示卡</small></span>
+</div>
+<p class="flow-note">任一节点可<b>驳回到指定的已办节点</b>（QMS 列出可退节点，调用 OA 退回接口），必填原因并留痕；执行部门未填完成日期不能提交；处置未闭环不能结案；结案后可<b>重新启用</b>（如退货后技术改善可用），从实物处置节点重新流转，历史保留。</p>
+<div class="states"><span class="st">PROCESSING<em>处理中</em></span><span class="st">WAIT_NEXT<em>待下工站确认</em></span><span class="st">WAIT_CLOSE<em>待结案</em></span><span class="st">CLOSED<em>已结案</em></span><span class="st">REOPENED<em>已重新启用</em></span></div>
+<p>对外显示 5 个状态，内部另记当前节点（current_node）用于待办与退回。</p>
+<div class="tbl"><table>
+<thead><tr><th>栏目</th><th>字段（新增标 <span class="tag t-new">新</span>）</th><th>规则</th></tr></thead>
+<tbody>
+<tr><td>表头</td><td>异常单号、异常类型 <span class="tag t-new">新</span>（内部/供应商/客诉）、来源检验单号 <span class="tag t-new">新</span></td><td>自动生成时带入</td></tr>
+<tr><td>1 不合格品信息</td><td>发现工站、发现岗位、批次号、客户/料号/品名规格、订单号 <span class="tag t-new">新</span>、供应商 <span class="tag t-new">新</span>、发现日期、异常描述/图片、缺陷类型 <span class="tag t-new">新</span>、检验员、责任者/检验责任者、可疑品数量、检查数/不良数/不良率、是否发生过客诉/重复发生</td><td>订单号客诉、OQC 必填；供应商异常必填供应商；重复发生按料号 + 缺陷类型检索历史异常与警示卡给建议</td></tr>
+<tr><td>2 内部生产</td><td>原因分析、改善措施、结果确认（跟踪验证）、8D/4D 附件</td><td>三字段齐全才能进入结果确认</td></tr>
+<tr><td>3 本批处置</td><td>处置方式（特采/退货/挑选/全检/返工/返修/报废/下工站确认）、处置方案说明、工序负责人/日期、关联特采单号 <span class="tag t-new">新</span></td><td>特采时必填特采单号（SY/FM1610）；客诉可反查曾特采批次</td></tr>
+<tr><td>4 会签</td><td>会签部门（计划/采购/工程/业务/其他）、部门意见/确认者/日期、计划完成日期、产能影响 <span class="tag t-new">新</span>（是否影响出货 / 生产计划 / ERP 是否需调整）</td><td>24 小时内完成，超时每 4 小时提醒；未填计划完成日期不能提交</td></tr>
+<tr><td>下工站确认 <span class="tag t-new">新</span></td><td>工站、确认人、确认日期、确认结果、不良数、佐证</td><td>如冷镦针穴通规 NG 须电镀后确认；挂起期间不计时</td></tr>
+<tr><td>5 结果确认</td><td>实物处置明细：批号、可疑数、处置方式、部门、执行人、完成日期、合格数/不良数、报告编号；确认人、项目 QE</td><td>全检时在此分次录入不良数</td></tr>
+<tr><td>成本 <span class="tag t-new">新</span></td><td>材料 / 人工 / 工艺成本、报废重量、损失金额、是否纳入考核</td><td>不良数 × 单件成本（来源待确认 R7）；损失 &gt; 3,000 元自动加总经理节点</td></tr>
+<tr><td>6 审批</td><td>品质部意见、总经理意见</td><td>处置以品质部为准，冲突时以总经理为准</td></tr>
+<tr><td>系统</td><td>审批记录（节点/审批人/结果/时间）</td><td>打印时附在末尾</td></tr>
+</tbody></table></div>
+<p>时限：会签 24 小时；退货 7 天（含周末及法定假日），退货单 24 小时内提交执行部门。同批次 / 订单的多次反馈默认追加到同一张异常单的反馈记录（是否强制合单做成开关，R5）。异常批次锁定走 ERP 接口 #7（开关）。数据表 <code>qms_nc_main</code>、<code>_feedback</code>、<code>_sign</code>、<code>_next_station</code>、<code>_disposal</code>、<code>_cost</code>、<code>_sqe</code>。</p>
+</section>
+<section class="card">
+<h2 id="m-lab">3.6　实验室</h2>
+<p class="sec-intro">两条线共用样品台账。报告与实测数据同时保存，可按料号、批次号被 OQC 与出货报告抓取；设备自带报告（光谱仪等）以附件上传，关键数据另行录入。</p>
+<div class="grid2">
+  <div class="panel"><h4>委托检验线（对外 · 5 类项目）</h4>
+    <div class="flow" style="margin:6px 0"><span class="node">业务接待录入合同</span><span class="arr">→</span><span class="node">委托人确认</span><span class="arr">→</span><span class="node">组长承接分配</span><span class="arr">→</span><span class="node">原始记录<small>检测员 → 复核员</small></span><span class="arr">→</span><span class="node">报告编制</span><span class="arr">→</span><span class="node">复核</span><span class="arr">→</span><span class="node end">授权签字人<small>检测专用章</small></span></div>
+    <p style="font-size:13px">项目：盐雾、拉力、洛氏硬度、维氏硬度、成分分析。原始记录提交即锁定并生成报告草稿；报告驳回时解锁原始记录（Q10 建议）。</p></div>
+  <div class="panel"><h4>测试报告线（对内 · 19 类项目）</h4>
+    <div class="flow" style="margin:6px 0"><span class="node">测试数据填报</span><span class="arr">→</span><span class="node">测试员提交</span><span class="arr">→</span><span class="node end">组长核准<small>质量合格章</small></span></div>
+    <p style="font-size:13px">项目：盐雾、拉力、洛氏硬度/扭力、维氏硬度、成分、膜厚、三坐标、轮廓、金相、氢脆、金属流线、螺纹折叠、清洁度，另 5 类（尺寸、摩擦系数、粗糙度、锁紧、横向振动）模板待提供。</p></div>
+</div>
+<h4>维氏硬度原始记录的系统规则</h4>
+<ul class="tight">
+  <li>设备选择后带出型号、编号、校准有效期；超期禁止提交（CNAS）</li>
+  <li>开机核查 5 项固定：标准块示值误差 ≤ ±3%（填实测，自动算误差）、压头外观、设备水平、物镜光学（OK/NG）、环境 10～35 ℃ 且 ≤ 80 %RH</li>
+  <li>每点录 D1、D2，系统按 HV = 1.8544 F / d² 计算并修约至整数，表示为「XXX HVxx」；有效测点 ≥ 3</li>
+  <li>记录保存 ≥ 6 年、不可删除，修改保留原值、修改人、时间；「电子签名无效」与手写签名的冲突待确认（R9），备选方案为打印签字页扫描归档</li>
+</ul>
+<h4>委托报告取数（Q9 初稿）</h4>
+<div class="tbl"><table>
+<thead><tr><th>报告字段</th><th>取自</th></tr></thead>
+<tbody>
+<tr><td>样品编号、客户名称/地址、样品名称、规格、材质牌号、零件号、测试要求、样品来源、收样日期</td><td>委托合同 + 样品台账</td></tr>
+<tr><td>检测中心参考号、签发日期、页码、测试周期</td><td>系统（测试周期 = 收样日期至报告完成）</td></tr>
+<tr><td>测试方法、判定依据</td><td>原始记录「依据标准」+ 合同「检测依据」</td></tr>
+<tr><td>硬度符号 / 样品 / 测试部位 / 结果 / 要求 / 结论</td><td>原始记录分时检测明细</td></tr>
+<tr><td>设备 / 型号 / 编号 / 校准日期 / 下次校准日期</td><td>原始记录设备区 + 设备台账</td></tr>
+<tr><td>样品照片；授权签字人、检测专用章、免责声明</td><td>原始记录留样照片；审批节点 + 固定文本</td></tr>
+</tbody></table></div>
+<h4>样品</h4>
+<p>客户样品台账（SYBD7.4-01）由样品管理员录入编号，新增<b>库位 / 在库状态</b>（在库 / 已领用 / 已消耗 / 已废弃 / 已退回），由领用、归还单流程回调自动更新。领用、归还两张单均为 <span class="tag t-p1">P1</span>：申请人 → 样品管理员；归还数 ≤ 领用数，归还单从未归还的领用单带出。留样柜目录（约 850 条）两组共同维护不审批，留样类型由备注改为多选（冷镦 / 过模样 / 合模样 / 表面处理），确认状态空超过 30 天提醒工程。</p>
+<p>数据表：<code>qms_lab_contract</code> / <code>_line</code>、<code>qms_lab_raw</code> / <code>_check</code> / <code>_point</code>、<code>qms_lab_test</code> / <code>_data</code>（19 类测试数据，数据项按模板定义）、<code>qms_lab_report</code>（report_line = ENTRUST / TEST，sign_nodes = 3 / 2）、<code>qms_lab_report_tpl</code>、<code>qms_lab_sample</code>、<code>qms_lab_loan</code>、<code>qms_lab_return</code>、<code>qms_lab_retain</code>、<code>qms_base_equipment</code>、<code>qms_lab_std_block</code>。</p>
+</section>
+<section class="card">
+<h2 id="m-ecn">3.7　变更管理（ECN）</h2>
+<p class="sec-intro"><span class="tag t-p2">P2</span>　按 SY/QP15 A6 落地，加入初审与 ERP 库存前置抓取。编号 ECN + YYMMDD + 3 位流水（如 ECN171211001）。</p>
+<div class="flow" aria-label="ECN流程">
+  <span class="node">发起变更<small>抓取 ERP 库存批次</small></span><span class="arr">→</span>
+  <span class="node">初审<small>判断拉通哪些部门；驳回即终止</small></span><span class="arr">→</span>
+  <span class="node">可行性评估<small>按 A/B/C 带出部门，并行</small></span><span class="arr">→</span>
+  <span class="node dec">需客户确认?<small>外部 / A 级</small></span><span class="arr">→</span>
+  <span class="node opt">客户确认<small>业务部书面提交；不批准即终止</small></span><span class="arr">→</span>
+  <span class="node">变更实施<small>生计安排试产、上传资料</small></span><span class="arr">→</span>
+  <span class="node dec">验证通过?<small>不通过退回实施</small></span><span class="arr">→</span>
+  <span class="node">文件更新<small>图纸、控制计划升版</small></span><span class="arr">→</span>
+  <span class="node end">关闭并分发<small>生成变更记录</small></span>
+</div>
+<p class="flow-note">内部 B/C 级评估后直接实施；外部变更和 A 级先经客户确认。外部变更顺翼品号后加新图面版本号，关闭后新品号首批自动标记「初期品」供 IPQC/OQC 识别；变更前未处理产品提示贴黄色「产品变更标签」。</p>
+<div class="tbl"><table>
+<thead><tr><th>等级</th><th>判定标准</th><th>评审部门</th><th>批准人</th><th>客户</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-bad">A 关键</span></td><td>影响安全、法规、核心功能、主要合同要求；全新设计或平台变更</td><td>工程、计划、品质、生产、采购、市场/销售</td><td>部门经理 + 总经理</td><td>报备客户，提前 2 个月（日系 6 个月）</td></tr>
+<tr><td><span class="tag t-warn">B 主要</span></td><td>影响局部功能、工艺方法、成本；不涉安全法规</td><td>工程、计划、品质、受影响部门</td><td>部门经理</td><td>自我管理</td></tr>
+<tr><td><span class="tag t-ok">C 次要</span></td><td>文字错误、不影响功能的尺寸微调、明确的工艺参数优化</td><td>工程部、品质部（会签）</td><td>部门经理</td><td>自我管理</td></tr>
+</tbody></table></div>
+<p>附录 A 约 60 种变更内容做成级联下拉（人/机/料/法/环/测 → 内容），选中带出等级、批准人、是否报备客户、时限（如「材料钢厂变更」→ A；「量具更换」→ C）。配置修改只影响新单，在途单保留快照。</p>
+<h4>各部门变更事项（预置 12 项）</h4>
+<div class="tbl"><table>
+<thead><tr><th>部门</th><th>事项</th><th>联动</th></tr></thead>
+<tbody>
+<tr><td>业务</td><td>成本核算、客户品号维护</td><td>—</td></tr>
+<tr><td>生产</td><td>模具</td><td>指派模具部门填报模具明细（ERP 无模具数据）</td></tr>
+<tr><td>工程</td><td>ERP 系统维护、图纸更新、PPAP 更新</td><td>图纸先发试产版，验证通过转受控正式版</td></tr>
+<tr><td>采购</td><td>外购图重新发行、外购件成本核算</td><td>文档模块发放</td></tr>
+<tr><td>品质</td><td>检验基准更新、量具</td><td>—</td></tr>
+<tr><td>仓库</td><td>包装基准更新</td><td>标签提醒</td></tr>
+<tr><td>工程 <span class="tag t-new">新</span></td><td>控制计划更新</td><td>自动生成控制计划升版任务</td></tr>
+</tbody></table></div>
+<p>每项分发为部门待办（OA 消息），跟踪逾期；全部完成或标「不涉及」才可关闭。关闭后推送业务、工程、采购、物控、仓库、质量、生产 7 个部门回签，并每个料号生成一行 SYFM1503 变更记录一览表（历史约 5,400 行需导入，增加「是否涉及包装规范」标记字段）。物料处置前对应批次经 ERP 接口 #7 锁定（开关）。</p>
+<div class="states"><span class="st">PRE_REVIEW<em>初审中</em></span><span class="st">EVALUATING<em>评估中</em></span><span class="st">CUST_CONFIRM<em>待客户确认</em></span><span class="st">IMPLEMENTING<em>实施中</em></span><span class="st">VERIFYING<em>验证中</em></span><span class="st">DOC_UPDATING<em>文件更新中</em></span><span class="st">CLOSED<em>已关闭</em></span><span class="st">TERMINATED<em>已终止</em></span></div>
+<p>数据表：<code>qms_ecn_main</code>、<code>_part</code>（变更清单，多料号）、<code>_stock</code>（物料统计与处置）、<code>_mold</code>、<code>_eval</code>、<code>_dept_task</code>、<code>_trial</code>、<code>_ack</code>、<code>_grade_cfg</code>、<code>_record</code>。</p>
+</section>
+<section class="card">
+<h2 id="m-erp">3.8　ERP 对接（鼎捷）</h2>
+<p class="sec-intro">QMS 内不允许手工新增客户、供应商、物料。接口不通时主数据支持 Excel 导入兜底。每个接口记日志（请求、响应、状态、重试次数），写入类接口以「业务单号 + 动作」为幂等键，失败每 5 分钟重试，3 次后通知系统管理员。</p>
+<div class="tbl"><table>
+<thead><tr><th>#</th><th>接口</th><th>方向</th><th>同步策略</th><th>用在哪里</th><th>本期</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>物料主数据</td><td>ERP → QMS</td><td>每日增量 + 手动触发</td><td>控制计划、检验单、异常单、ECN、警示卡、留样</td><td><span class="tag t-ok">必做</span></td></tr>
+<tr><td>2</td><td>供应商</td><td>ERP → QMS</td><td>每日增量 + 手动触发</td><td>IQC、供应商异常、供应商质量报表</td><td><span class="tag t-ok">必做</span></td></tr>
+<tr><td>3</td><td>客户</td><td>ERP → QMS</td><td>每日增量 + 手动触发</td><td>控制计划、OQC、出货报告模板匹配、客诉</td><td><span class="tag t-ok">必做</span></td></tr>
+<tr><td>4</td><td>库存（含批次）</td><td>ERP → QMS</td><td>实时查询，不落库（ECN 存读取时点快照）</td><td>ECN 物料统计、异常单可疑品范围</td><td><span class="tag t-ok">必做</span></td></tr>
+<tr><td>5</td><td>待检单据推送</td><td>ERP → QMS</td><td>事件触发</td><td>自动生成 IQC / IPQC / OQC</td><td><span class="tag t-warn">开关 · R10</span></td></tr>
+<tr><td>6</td><td>检验结果回写</td><td>QMS → ERP</td><td>判定即回写</td><td>放行，不等组长审核</td><td><span class="tag t-warn">开关 · R10</span></td></tr>
+<tr><td>7</td><td>批次锁定 / 解锁</td><td>QMS → ERP</td><td>事件触发</td><td>异常未处置、变更前库存未处置时禁止周转</td><td><span class="tag t-warn">开关 · R10</span></td></tr>
+<tr><td>8</td><td>销售订单</td><td>ERP → QMS</td><td>实时查询</td><td>异常单与订单关联、客诉追溯</td><td><span class="tag t-warn">开关</span></td></tr>
+</tbody></table></div>
+<p>适配层按「中间库 / Web API」两种实现，鼎捷确认后只改适配器与字段映射表 <code>qms_sys_if_mapping</code>，业务代码不动。开关关闭时：#5 由检验员手工创建检验单；#6、#7 在单据上显示「需人工在 ERP 处理」提示。</p>
+</section>
+<section class="card">
+<h2 id="m-rpt">3.9　报表、系统交互与角色权限</h2>
+<p>每张报表顶部自动生成一句话结论（如「10 月 1～15 日进料 46 批，不合格 2 批，均为 V012」），可按时间段筛选、下钻到单据、导出 Excel。</p>
+<div class="tbl"><table>
+<thead><tr><th>报表</th><th>口径</th><th>维度</th></tr></thead>
+<tbody>
+<tr><td>首件一次合格率</td><td>调机次数 = 1 的合格首件数 ÷ 首件总数</td><td>工序、机台、操作员、日/周/月</td></tr>
+<tr><td>检验合格率 / PPM</td><td>合格批 ÷ 总批；不良数 ÷ 检验数 × 10⁶</td><td>供应商、工序、客户、料号</td></tr>
+<tr><td>供应商质量</td><td>来料批合格率、异常次数、特采次数</td><td>供应商、月</td></tr>
+<tr><td>质量成本</td><td>材料 + 人工 + 工艺成本、报废金额</td><td>责任部门、客户、月</td></tr>
+<tr><td>品质异常汇总表</td><td>异常单号、发现日期、岗位、客户、料号、批次、缺陷类型、不良数/率、处置、损失、责任部门、状态、结案日期</td><td>发现岗位、缺陷类型、状态</td></tr>
+<tr><td>SC/CC 特性报表</td><td>特殊特性实测值、合格率、Cpk</td><td>料号、特性、批次</td></tr>
+<tr><td>文件借阅 / 会签汇总</td><td>按单据明细</td><td>部门、文件、月</td></tr>
+<tr><td>变更履历</td><td>单零件 / 全部零件</td><td>客户、料号、等级、状态</td></tr>
+<tr><td>实验室报告台账</td><td>报告数、测试周期、不合格数</td><td>测试项目、客户、月</td></tr>
+<tr><td>项目进度</td><td>节点完成率、逾期节点数</td><td>项目、责任人</td></tr>
+<tr><td>质量日报</td><td>当日检验批数、合格率、新增异常；每日定时推送</td><td>接收人待确认</td></tr>
+</tbody></table></div>
+<div class="grid2">
+  <div class="panel"><h4>系统交互</h4><ul>
+    <li><b>图纸悬浮窗</b>：检验单、异常单可浮窗查看图纸（缩放、拖动）、控制计划、警示卡；平板可行性待确认</li>
+    <li><b>二维码</b>：按料号 + 工序（或批次）生成，张贴机台，扫码进入检验页；绑定对象做成可配</li>
+    <li><b>终端</b>：电脑录入与编制；平板巡检；手机移动审批</li>
+    <li><b>签名与印章</b>：会签单、原始记录手写签名；出货报告、测试报告盖质量合格章，委托报告盖检测专用章；章只在最终节点通过后由系统加盖</li></ul></div>
+  <div class="panel"><h4>角色（名单 55 人）</h4><ul>
+    <li>品质经理 / 副主管：朱学武 / 申鹏波</li>
+    <li>体系（文控）：王星越（发放表中的余中如不在名单内）</li>
+    <li>IQC：彭红兵等 10 人；IPQC：王鹏等 7 人；OQC：李琴、魏梦茹、李嘉乐；CQE：祝程、沈敏婕、刘昆</li>
+    <li>工程：王彦利、林扬帆、邱伟等 7 人；计划部：冯瑾、罗成凯等；采购：刘兴英；业务：周爱国、王慧等</li>
+    <li><span class="tag t-warn">需补充</span> 实验室测试员、组长、样品管理员、授权签字人、生产班组长、总经理；王慧与王彦利电话相同需核对</li></ul></div>
+</div>
+</section>
+<section class="card">
+<h2 id="data">4　数据模型总览</h2>
+<p class="sec-intro">MySQL 独立库 <code>td_qms</code>，表名 <code>qms_模块_实体</code>。每张业务表带公共字段：id、status、<b>run_id</b>（通达流程实例号）、created_by/name/at、updated_by/at、row_ver（乐观锁）、is_deleted（只做逻辑删除）。四个追溯主键贯通全部模块。</p>
+<div class="tbl"><table>
+<thead><tr><th>追溯键</th><th>含义</th><th>出现在</th></tr></thead>
+<tbody>
+<tr><td><code>part_no</code></td><td>顺翼料号</td><td>图纸、控制计划、检验单、SPC、异常单、ECN 变更清单、实验室报告、警示卡、留样、项目</td></tr>
+<tr><td><code>batch_no</code></td><td>生产批次（如 510120260626001）</td><td>IPQC/OQC 检验、SPC 子组、异常单、ECN 物料统计、实验室报告、样品</td></tr>
+<tr><td><code>heat_no</code></td><td>原材炉批号（光谱样品名「炉号-材质-线径」中的炉号）</td><td>IQC、首件「料」、光谱/拉伸/金相报告、供应商异常</td></tr>
+<tr><td><code>order_no</code></td><td>客户订单号</td><td>异常单、出货报告</td></tr>
+</tbody></table></div>
+<div class="tbl"><table>
+<thead><tr><th>模块</th><th>表</th><th class="num">数</th></tr></thead>
+<tbody>
+<tr><td>基础</td><td>base_part、base_customer、base_supplier、base_equipment、base_gauge、base_standard</td><td class="num">6</td></tr>
+<tr><td>文档</td><td>doc_file、doc_version、doc_borrow(+item)、doc_sign(+dept)、doc_dcr、doc_dist(+item、recall)、doc_reissue、doc_print(+log)、doc_drawing(+ack)</td><td class="num">15</td></tr>
+<tr><td>项目</td><td>prj_main、prj_member、prj_task、prj_feedback、prj_tpl(+task)</td><td class="num">6</td></tr>
+<tr><td>控制计划</td><td>cp_main、cp_team、cp_item、cp_item_dim、cp_tpl(+item)、cp_review_task</td><td class="num">7</td></tr>
+<tr><td>质检</td><td>insp_task、insp_main、insp_item、insp_value、insp_fetch、oqc_report(+item、cust_tpl、send_log)、warn_card(+item)、spc_chart(+subgroup、limit、alarm)</td><td class="num">15</td></tr>
+<tr><td>异常</td><td>nc_main、nc_feedback、nc_sign、nc_next_station、nc_disposal、nc_cost、nc_sqe、nc_threshold</td><td class="num">8</td></tr>
+<tr><td>实验室</td><td>lab_contract(+line)、lab_raw(+check、point)、lab_test(+data)、lab_report(+tpl)、lab_sample、lab_loan、lab_return、lab_retain、lab_std_block</td><td class="num">14</td></tr>
+<tr><td>变更</td><td>ecn_main、ecn_part、ecn_stock、ecn_mold、ecn_eval、ecn_dept_task、ecn_trial、ecn_ack、ecn_grade_cfg、ecn_record</td><td class="num">10</td></tr>
+<tr><td>系统</td><td>sys_dict、sys_number_rule、sys_attachment、sys_signature、sys_oper_log、sys_msg_tpl(+log)、sys_timer_cfg、sys_if_log、sys_if_mapping、sys_switch、sys_oa_flow_map</td><td class="num">12</td></tr>
+</tbody></table></div>
+<p><code>sys_oa_flow_map</code> 记录每类单据对应的 OA 流程 ID、落地方式（P1/P2）、各节点号与 QMS 节点编码的对应关系；<code>sys_switch</code> 保存第 7 章待确认项的开关取值。</p>
+</section>
+<section class="card" id="proto">
+<h2>5　页面原型（通达 OA 风格）</h2>
+<p class="sec-intro">全部页面在 OA 窗口内呈现：P1 单据就是通达流程表单；P2 单据的 QMS 办理页沿用同一套表单样式（左侧表单 / 附件 / 会签工具条、底部「转交下一步」）；P3 功能页用 OA 门户卡片样式。数据为示例；首件检验可直接改实测值体验自动判定。</p>
+<div class="proto-tabs" role="tablist" aria-label="原型切换">
+  <button role="tab" id="tab-home" aria-selected="true" aria-controls="p-home">质量门户</button>
+  <button role="tab" id="tab-new" aria-selected="false" aria-controls="p-new">新建工作</button>
+  <button role="tab" id="tab-form" aria-selected="false" aria-controls="p-form">借阅申请表</button>
+  <button role="tab" id="tab-turn" aria-selected="false" aria-controls="p-turn">转交下一步</button>
+  <button role="tab" id="tab-insp" aria-selected="false" aria-controls="p-insp">首件检验</button>
+  <button role="tab" id="tab-nc" aria-selected="false" aria-controls="p-nc">异常单办理</button>
+  <button role="tab" id="tab-cp" aria-selected="false" aria-controls="p-cp">控制计划</button>
+  <button role="tab" id="tab-prj" aria-selected="false" aria-controls="p-prj">项目甘特图</button>
+</div>
+
+<!-- 质量门户 -->
+<div id="p-home" role="tabpanel" aria-labelledby="tab-home" class="win">
+  <div class="win-top"><div class="oa-logo">Office Anywhere<sup>®</sup></div><div class="oa-tabs"><span class="on">首页</span><span>我的桌面</span></div></div>
+  <div class="win-body">
+    <div class="win-menu"><div>快捷菜单</div><div>个人事务</div><div>流程中心</div><div class="h">质量管理</div><div class="s on">质量门户</div><div class="s">文件库</div><div class="s">检验终端</div><div class="s">异常单</div><div class="s">变更管理</div><div class="s">实验室</div><div class="s">项目管理</div><div class="s">报表中心</div></div>
+    <div class="win-main pad">
+      <div class="pcard">
+        <div class="counters" style="margin:0"><div>待办工作<b>12</b></div><div>待检任务<b>8</b></div><div>在途异常<b>7</b></div><div>在途变更<b>4</b></div><div>待签收文件<b>3</b></div></div>
+        <div class="portal" style="margin-top:10px">
+          <div class="todo-card"><b>NC-20261022-002 品质异常 · 会签</b><small>朱学武 · 10-22 09:14</small><br><span class="st2">办理中</span></div>
+          <div class="todo-card"><b>ECN261020001 工程变更 · 可行性评估</b><small>王彦利 · 10-20 16:02</small><br><span class="st2">办理中</span></div>
+          <div class="todo-card"><b>CP-2026-018 A1 控制计划 · 一级审核</b><small>林扬帆 · 10-21 11:30</small><br><span class="st2">办理中</span></div>
+        </div>
+      </div>
+      <div class="portal">
+        <div class="pcard"><h6>质量日报</h6><div class="sentence">10 月 1～22 日进料 46 批，不合格 2 批，均为 V012；首件一次合格率 91.4%；在途异常 7 张，其中 2 张会签超时。</div>
+          <div class="kv"><span>IQC 批合格率</span><b>95.7%</b><span>客诉 PPM</span><b>38</b><span>质量成本</span><b>¥18,420</b></div></div>
+        <div class="pcard"><h6>异常按缺陷类型</h6><div class="bars">
+          <div><span>尺寸</span><i style="width:100%"></i><span class="mono">12</span></div>
+          <div><span>外观</span><i style="width:58%"></i><span class="mono">7</span></div>
+          <div><span>性能</span><i class="o" style="width:25%"></i><span class="mono">3</span></div>
+          <div><span>包装标签</span><i style="width:17%"></i><span class="mono">2</span></div>
+          <div><span>材料</span><i style="width:8%"></i><span class="mono">1</span></div></div></div>
+        <div class="pcard"><h6>常用功能</h6><div class="kv" style="gap:8px">
+          <span class="tag t-p2">扫码检验</span><span class="tag t-p2">新建异常单</span><span class="tag t-p2">发起变更</span><span class="tag t-p2">实验委托</span><span class="tag t-p2">文件借阅</span><span class="tag t-p2">受控打印</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 新建工作 -->
+<div id="p-new" role="tabpanel" aria-labelledby="tab-new" class="win" hidden>
+  <div class="win-top"><div class="oa-logo">Office Anywhere<sup>®</sup></div><div class="oa-tabs"><span>首页</span><span class="on">新建工作</span></div></div>
+  <div class="win-body">
+    <div class="win-menu"><div class="h">流程中心</div><div class="s on">新建工作</div><div class="s">我的工作</div><div class="s">工作查询</div><div class="s">工作监控</div><div class="s">超时统计分析</div><div class="s">工作委托</div><div class="s">工作流设置</div></div>
+    <div class="win-main">
+      <div class="nw-head"><h5>新建工作</h5><div class="nw-q"><span>请输入流程名称</span><b>查询</b></div></div>
+      <div class="nw-grid">
+        <div class="nw-cat"><div>常用工作</div><div>全部工作</div><div class="on">质量管理-文档</div><div>质量管理-实验室</div><div>质量管理-审批</div><div>行政管理</div></div>
+        <div class="nw-list"><h6>质量管理-文档</h6>
+          <div class="nw-item"><div><b>文件借阅申请（SY/FM0306）</b><small>申请人 → 部门主管 → 文控 · P1</small></div><span class="nw-ico">⌁</span><span class="nw-ico">i</span></div>
+          <div class="nw-item"><div><b>文件会签单（SY/FM0309）</b><small>起草人 → 并行会签 → 审核 → 批准 · P1</small></div><span class="nw-ico">⌁</span><span class="nw-ico">i</span></div>
+          <div class="nw-item"><div><b>文件和资料更改申请单（SY/FM0304）</b><small>会签最多 5 部门 · P1</small></div><span class="nw-ico">⌁</span><span class="nw-ico">i</span></div>
+          <div class="nw-item"><div><b>文件补发申请表（SY/FM0305）</b><small>尚未发起过该流程</small></div><span class="nw-ico">⌁</span><span class="nw-ico">i</span></div>
+          <div class="nw-item"><div><b>受控打印申请</b><small>尚未发起过该流程</small></div><span class="nw-ico">⌁</span><span class="nw-ico">i</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 借阅申请表（P1 通达流程表单） -->
+<div id="p-form" role="tabpanel" aria-labelledby="tab-form" class="win" hidden>
+  <div class="win-top"><div class="oa-logo">Office Anywhere<sup>®</sup></div><div class="oa-tabs"><span>新建工作</span><span class="on">新建工作 - 文件借阅申请</span></div></div>
+  <div class="win-main">
+    <div class="wf-head"><span class="no">No. 12051 文件借阅申请流程（2026年10月22日16:05）</span><span class="lv">普通 ▾</span><span class="step">主办（第1步：申请人申请）</span></div>
+    <div class="wf-grid">
+      <div class="wf-tools"><div class="tb b">▤<span>表单</span></div><div class="tb o">⎘<span>附件</span></div><div class="tb g">☑<span>会签</span></div><div class="tl">流程图</div><div class="tl">委托</div><div class="tl">打印</div></div>
+      <div class="wf-paper"><div class="form">
+        <div class="ft">文件与资料借阅登记表</div>
+        <div class="fmeta">流水号：12051　　申请单号：<span class="fi auto" style="min-width:150px">JY20261022001</span></div>
+        <table>
+          <tr><td class="l">借阅部门：</td><td><span class="fi auto">工程部</span></td><td class="l">借阅者：</td><td><span class="fi auto">林扬帆</span></td></tr>
+          <tr><td class="l">借阅日期：</td><td><span class="fi">2026-10-22</span><span class="req">*</span></td><td class="l">计划归还日期：</td><td><span class="fi">2026-10-29</span><span class="req">*</span></td></tr>
+          <tr><td class="l blue">借阅文件：</td><td colspan="3">
+            <table class="sub"><tr><th>文件编号</th><th>文件名称</th><th>版本</th><th>状态</th></tr>
+            <tr><td>SY/QP12</td><td>产品质量先期策划程序</td><td>A3</td><td><span class="tag t-ok">受控正式版</span></td></tr>
+            <tr><td>SY/QP15</td><td>设计和工程变更控制程序</td><td>A6</td><td><span class="tag t-ok">受控正式版</span></td></tr></table>
+            <small style="color:var(--muted);font-family:var(--f-body)">QMS 文件选择控件：只能选受控正式版</small></td></tr>
+          <tr><td class="l blue">借阅方式：</td><td colspan="3"><span class="radio on">电子阅读</span><span class="radio">纸质借阅</span></td></tr>
+          <tr><td class="l">借阅理由：</td><td colspan="3"><span class="fi area">A043 异形块新品 APQP，查阅策划与变更程序。</span></td></tr>
+          <tr class="sect"><td colspan="4">审批意见</td></tr>
+          <tr><td class="l">部门主管：</td><td colspan="3"><span class="radio">同意</span><span class="radio">不同意</span><span class="fi grey area" style="margin-top:6px"></span></td></tr>
+          <tr><td class="l">文控：</td><td colspan="3"><span class="radio">同意并开放阅读权限</span><span class="radio">不同意</span><span class="fi grey area" style="margin-top:6px"></span></td></tr>
+          <tr><td class="l">实际归还日期：</td><td colspan="3"><span class="fi grey">到期自动写入</span></td></tr>
+        </table>
+      </div></div>
+    </div>
+    <div class="wf-foot"><button class="btn pri" type="button" data-go="tab-turn">转交下一步</button><button class="btn" type="button">保存</button><button class="btn" type="button">保存返回</button><button class="btn" type="button">取消</button></div>
+  </div>
+</div>
+
+<!-- 转交下一步 -->
+<div id="p-turn" role="tabpanel" aria-labelledby="tab-turn" class="win" hidden>
+  <div class="win-top"><div class="oa-logo">Office Anywhere<sup>®</sup></div><div class="oa-tabs"><span class="on">新建工作 - 文件借阅申请</span></div></div>
+  <div class="win-main" style="min-height:440px;background:#dfe5ee">
+    <div class="mask"><div class="dlg">
+      <h6>NO. 12051 文件借阅申请流程（2026年10月22日16:05）</h6>
+      <div class="in">
+        <div class="bar">当前步骤为第<em>1</em>步[申请人申请] <em>林扬帆（办理中）</em></div>
+        <div class="bar">请选择下一步骤 ▾</div>
+        <div class="steps"><div class="sl"><div class="on">☑ 部门主管审批</div></div>
+          <div class="sr"><div>部门主管审批　　<span style="color:var(--oa-blue)">主办人：</span><span class="chip">王彦利 ×</span></div><div><button class="btn" type="button">选择人员</button>　<span style="color:var(--oa-blue)">经办人：</span><span class="chip">王彦利 ×</span></div></div></div>
+        <div class="bar">▸ 向以下人员发送事务提醒消息　下一步骤 🔔 ✉　发起人 🔔 ✉</div>
+        <p style="font-size:12.5px;color:var(--muted);margin:0">P1 流程：OA 自带转交；到「文控」节点办结时，流程插件回调 QMS 开放阅读权限并设定到期收回。</p>
+      </div>
+      <div class="ft2"><button class="btn pri" type="button">确定</button><button class="btn" type="button" data-go="tab-form">取消</button></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- 首件检验（P3） -->
+<div id="p-insp" role="tabpanel" aria-labelledby="tab-insp" class="win" hidden>
+  <div class="win-top"><div class="oa-logo">Office Anywhere<sup>®</sup></div><div class="oa-tabs"><span>检验终端</span><span class="on">首件检验 FA-20261022-03</span></div></div>
+  <div class="win-main pad">
+    <div class="pcard"><div class="kv"><span>料号</span><b>S002008 快换螺栓 M16×53.5</b><span>客户</span><b>A049</b><span>批次</span><b class="mono">510120261022003</b><span>工序</span><b>20 冷镦成型</b><span>原因</span><b>换模</b><span>控制计划</span><b>CP-2026-018 A1</b></div>
+      <div class="kv" style="margin-top:4px"><span>人</span><b>郭枭</b><span>机</span><b>LD-03</b><span>料</span><b class="mono">H2609-1103</b><span>法</span><b>SY/WI0318 A0</b><span>调机次数</span><b>1</b><span>检验员</span><b>王鹏</b></div></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+      <div class="tbl" style="flex:1 1 520px;margin:0"><table class="insp">
+        <thead><tr><th>#</th><th>项目</th><th>分类</th><th>标准</th><th>量具</th><th>S1</th><th>S2</th><th>S3</th><th>判定</th></tr></thead>
+        <tbody id="insp-body">
+          <tr data-l="15.77" data-u="15.83"><td>3</td><td>杆径 D1</td><td><span class="tag t-sc">SC</span></td><td class="mono">Ø15.80±0.03</td><td>千分尺 SI0001</td><td><input id="v31" aria-label="杆径 S1" value="15.808"></td><td><input id="v32" aria-label="杆径 S2" value="15.811"></td><td><input id="v33" aria-label="杆径 S3" value="15.805"></td><td class="r"></td></tr>
+          <tr data-l="53.3" data-u="53.7"><td>4</td><td>总长 L1</td><td></td><td class="mono">53.5±0.2</td><td>卡尺 KC0012</td><td><input id="v41" aria-label="总长 S1" value="53.52"></td><td><input id="v42" aria-label="总长 S2" value="53.48"></td><td><input id="v43" aria-label="总长 S3" value="53.51"></td><td class="r"></td></tr>
+          <tr data-l="9.8" data-u="10.2"><td>5</td><td>头高 H1</td><td><span class="tag t-sc">CC</span></td><td class="mono">10±0.2</td><td>卡尺 KC0012</td><td><input id="v51" aria-label="头高 S1" value="10.05"></td><td><input id="v52" aria-label="头高 S2" value="10.24"></td><td><input id="v53" aria-label="头高 S3" value="10.02"></td><td class="r"></td></tr>
+        </tbody></table></div>
+      <div class="float" aria-label="图纸悬浮窗"><div class="fh"><span>图纸 DWG-S002008 B</span><span>－ ＋ ✕</span></div><div class="fb">
+        <svg viewBox="0 0 240 120" width="100%" role="img" aria-label="零件简图"><rect x="30" y="45" width="150" height="30" fill="none" stroke="#29466e"/><rect x="180" y="35" width="30" height="50" fill="none" stroke="#29466e"/><line x1="30" y1="100" x2="210" y2="100" stroke="#29466e" stroke-dasharray="3 3"/><text x="105" y="114" font-size="9" fill="#29466e" text-anchor="middle">L1 53.5±0.2</text><text x="34" y="40" font-size="9" fill="#29466e">D1 Ø15.80±0.03 ◇SC</text></svg>
+        拖动 · 缩放 · 不离开录入页</div></div>
+    </div>
+    <p style="margin-top:10px">综合判定：<span id="insp-total"></span></p>
+    <div class="wf-foot" style="margin:8px -14px -14px"><button class="btn" type="button">拍照</button><button class="btn" type="button">警示卡（2 条）</button><button class="btn danger" type="button">生成异常单</button><button class="btn pri" type="button">提交判定</button></div>
+  </div>
+</div>
+
+<!-- 异常单办理（P2：QMS 页面，沿用 OA 表单样式） -->
+<div id="p-nc" role="tabpanel" aria-labelledby="tab-nc" class="win" hidden>
+  <div class="win-top"><div class="oa-logo">Office Anywhere<sup>®</sup></div><div class="oa-tabs"><span>我的工作</span><span class="on">品质异常通知单 - 会签</span></div></div>
+  <div class="win-main">
+    <div class="wf-head"><span class="no">No. 12046 品质异常通知单 NC-20261022-002（2026年10月22日09:14）</span><span class="lv">紧急 ▾</span><span class="step">会签（第3步：剩余 17 小时）</span></div>
+    <div class="wf-grid">
+      <div class="wf-tools"><div class="tb b">▤<span>表单</span></div><div class="tb o">⎘<span>附件</span></div><div class="tb g">☑<span>会签</span></div><div class="tl">图纸</div><div class="tl">控制计划</div><div class="tl">警示卡</div></div>
+      <div class="wf-paper"><div class="form">
+        <div class="ft">品质异常通知单</div>
+        <div class="fmeta">表单编号 SY/FM2302 A0　　异常类型：<span class="fi auto" style="min-width:90px">内部异常</span></div>
+        <table>
+          <tr class="sect"><td colspan="4">1. 不合格品信息</td></tr>
+          <tr><td class="l">发现工站：</td><td><span class="fi auto">冷镦</span></td><td class="l">发现岗位：</td><td><span class="fi auto">IPQC</span></td></tr>
+          <tr><td class="l">批次号：</td><td><span class="fi auto mono">510120261022003</span></td><td class="l">订单号：</td><td><span class="fi auto mono">SO2610-0187</span></td></tr>
+          <tr><td class="l">料号：</td><td><span class="fi auto">S002008</span></td><td class="l">来源检验单：</td><td><span class="fi auto">FA-20261022-03</span></td></tr>
+          <tr><td class="l">异常描述：</td><td colspan="3"><span class="fi auto wide">头高 H1 偏大，标准 10±0.2，实测 10.24</span></td></tr>
+          <tr><td class="l">检查数 / 不良数：</td><td><span class="fi auto">3 / 1（33.3%）</span></td><td class="l">可疑品数量：</td><td><span class="fi">3,200</span></td></tr>
+          <tr class="sect"><td colspan="4">3. 本批处置方案　·　4. 会签部门（24 小时）</td></tr>
+          <tr><td class="l">处置方式：</td><td colspan="3"><span class="radio">特采</span><span class="radio">退货</span><span class="radio on">挑选</span><span class="radio">返工</span><span class="radio">报废</span><span class="radio">下工站确认</span></td></tr>
+          <tr><td colspan="4"><table class="sub"><tr><th>会签部门</th><th>确认者</th><th>意见</th><th>计划完成</th><th>影响出货</th><th>签名</th></tr>
+            <tr><td>计划部</td><td>冯瑾</td><td>同意，安排夜班挑选</td><td>10-23</td><td>否</td><td><span class="sig">冯瑾</span></td></tr>
+            <tr><td>工程部</td><td>王彦利</td><td><span class="fi" style="min-width:120px"></span></td><td><span class="fi" style="min-width:70px"></span><span class="req">*</span></td><td><span class="radio">是</span><span class="radio">否</span></td><td><span class="fi grey" style="min-width:60px">手写</span></td></tr></table></td></tr>
+        </table>
+      </div></div>
+    </div>
+    <div class="wf-foot"><button class="btn" type="button">退回（选节点）</button><button class="btn" type="button">追加反馈</button><button class="btn" type="button">发起 ECN</button><button class="btn pri" type="button">转交下一步</button><button class="btn" type="button">保存</button></div>
+  </div>
+</div>
+
+<!-- 控制计划编制（P2） -->
+<div id="p-cp" role="tabpanel" aria-labelledby="tab-cp" class="win" hidden>
+  <div class="win-top"><div class="oa-logo">Office Anywhere<sup>®</sup></div><div class="oa-tabs"><span>控制计划</span><span class="on">CP-2026-018 A1 · 草稿</span></div></div>
+  <div class="win-main pad">
+    <div class="pcard"><div class="kv"><span>阶段</span><b>☑ 生产</b><span>零件编号</span><b>S002008 / 客户 100091871</b><span>名称</span><b>快换螺栓 M16×53.5</b><span>核心小组</span><b>王慧、王彦利、郭文猛、朱学武、刘兴英</b></div></div>
+    <div class="tbl" style="margin:0"><table>
+      <thead><tr><th>⑭</th><th>⑮ 过程</th><th>⑯ 设备</th><th>⑰</th><th>⑱ 产品特性</th><th>⑲ 过程特性</th><th>⑳</th><th>㉴ 规范</th><th>LSL / USL</th><th>㉵ 测量</th><th>首件</th><th>巡检</th><th>适用检验</th><th>数据</th><th>SPC</th></tr></thead>
+      <tbody>
+        <tr><td>10</td><td>材料进料检验</td><td>—</td><td>1</td><td>材质成分</td><td>—</td><td></td><td>10B21 按 GB/T 6478</td><td class="mono">—</td><td>文件核对</td><td>—</td><td>每批</td><td><span class="tag t-mute">IQC</span></td><td>文件</td><td>否</td></tr>
+        <tr><td rowspan="2">20</td><td rowspan="2">冷镦成型</td><td rowspan="2">冷镦机 LD-03</td><td>3</td><td>杆径 D1</td><td>模具磨损量</td><td><span class="tag t-sc">SC</span></td><td class="mono">Ø15.80±0.03</td><td class="mono">15.77 / 15.83</td><td>千分尺</td><td>5 / 开班/换模</td><td>5 / 每2小时</td><td><span class="tag t-mute">首</span> <span class="tag t-mute">巡</span> <span class="tag t-mute">末</span></td><td>计量</td><td>是</td></tr>
+        <tr><td>4</td><td>总长 L1</td><td>镦锻压力</td><td></td><td class="mono">53.5±0.2</td><td class="mono">53.3 / 53.7</td><td>卡尺</td><td>5 / 开班/换模</td><td>—</td><td><span class="tag t-mute">首</span> <span class="tag t-mute">末</span></td><td>计量</td><td>否</td></tr>
+        <tr><td>50</td><td>热处理</td><td>网带炉（CQI-9）</td><td>17</td><td>表面硬度</td><td>淬火温度 860±10℃</td><td><span class="tag t-sc">CC</span></td><td class="mono">HRC 22-32</td><td class="mono">22 / 32</td><td>洛氏硬度计</td><td>首炉 / 开班/开炉</td><td>3 / 每炉</td><td><span class="tag t-mute">首</span> <span class="tag t-mute">巡</span></td><td>计量</td><td>否</td></tr>
+        <tr style="background:var(--bad-soft)"><td>60</td><td>电镀</td><td>电镀线（缺 CQI-11）</td><td>22</td><td>膜厚</td><td></td><td></td><td>按图纸</td><td class="mono" style="color:var(--bad)">无法拆分</td><td>膜厚仪</td><td>—</td><td></td><td><span class="tag t-mute">巡</span></td><td>计量</td><td>否</td></tr>
+      </tbody></table></div>
+    <p style="font-size:13px;color:var(--bad);margin-top:8px">校验 3 项未通过：【⑯ 设备】电镀工序须标注 CQI-11；【㉴ 规范】请展开为具体尺寸或填写数值；【巡检频次】勾选巡检的行频次必填。</p>
+    <div class="wf-foot" style="margin:8px -14px -14px"><button class="btn" type="button">插入行</button><button class="btn" type="button">全尺寸展开</button><button class="btn" type="button">从 Excel 粘贴</button><button class="btn" type="button">校验</button><button class="btn pri" type="button">转交下一步</button></div>
+  </div>
+</div>
+
+<!-- 项目甘特图（P3） -->
+<div id="p-prj" role="tabpanel" aria-labelledby="tab-prj" class="win" hidden>
+  <div class="win-top"><div class="oa-logo">Office Anywhere<sup>®</sup></div><div class="oa-tabs"><span>项目管理</span><span class="on">PRJ-2026-07 甘特图</span></div></div>
+  <div class="win-main pad">
+    <div class="pcard"><div class="kv"><span>项目</span><b>A043 异形块 13.25×27.7 新品开发</b><span>项目经理</span><b>林扬帆</b><span>进度</span><b>42%</b><span>逾期节点</span><b style="color:var(--bad)">1</b></div></div>
+    <div class="tbl" style="margin:0"><div class="gantt" role="img" aria-label="甘特图示例">
+      <div class="gh">节点 · 责任人</div><div class="gh">9 月 ───────── 10 月 ───────── 11 月</div>
+      <div class="gl">1.1 合同评审 · 王慧</div><div class="gt"><span class="gbar plan" style="left:2%;width:8%"></span><span class="gbar act g" style="left:2%;width:9%"></span><span class="today" style="left:58%"></span></div>
+      <div class="gl">2.1 图纸设计 · 邱伟</div><div class="gt"><span class="gbar plan" style="left:10%;width:15%"></span><span class="gbar act g" style="left:11%;width:15%"></span><span class="today" style="left:58%"></span></div>
+      <div class="gl">3.1 模具开发 · 郭文猛</div><div class="gt"><span class="gbar plan" style="left:24%;width:28%"></span><span class="gbar act r" style="left:26%;width:32%"></span><span class="today" style="left:58%"></span></div>
+      <div class="gl">3.2 PFMEA · 林扬帆</div><div class="gt"><span class="gbar plan" style="left:30%;width:30%"></span><span class="gbar act y" style="left:32%;width:26%"></span><span class="today" style="left:58%"></span></div>
+      <div class="gl">3.3 试生产控制计划</div><div class="gt"><span class="gbar plan" style="left:52%;width:14%"></span><span class="today" style="left:58%"></span></div>
+      <div class="gl">4.1 样件试产</div><div class="gt"><span class="gbar plan" style="left:66%;width:12%"></span><span class="today" style="left:58%"></span></div>
+      <div class="gl">4.2 PPAP 提交</div><div class="gt"><span class="gbar plan" style="left:80%;width:12%"></span><span class="today" style="left:58%"></span></div>
+    </div></div>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:8px">上条计划、下条实际；<span class="tag t-ok">正常</span> <span class="tag t-warn">临期 ≤3 天</span> <span class="tag t-bad">逾期</span>；橙线为今天。</p>
+  </div>
+</div>
+</section>
+
+<section class="card">
+<h2 id="migr">6　数据迁移</h2>
+<div class="tbl"><table>
+<thead><tr><th>数据</th><th>来源</th><th class="num">量</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>受控文件台账</td><td>SYFM0301（多 Sheet）</td><td class="num">≈ 1,400</td><td>合并分表、去重三级分类页 468 条；按 Sheet2 对照表挂靠上级程序；以制修订记录版本为准（如 SY/QP15 一览表登记 A2、现行 A6）</td></tr>
+<tr><td>文件附件</td><td>文控共享盘</td><td class="num">≈ 1,400</td><td>按文件编号匹配批量上传；未匹配清单人工处理</td></tr>
+<tr><td>变更记录一览表</td><td>SYFM1503</td><td class="num">≈ 5,400</td><td>变更时间兼容 yyyy.mm.dd / yyyy-mm-dd；解析失败进入异常清单；包装规范页转为标记字段</td></tr>
+<tr><td>留样柜目录</td><td>样品柜留样清单</td><td class="num">≈ 850</td><td>备注中的留样类型拆为多选；库位校验格式「字母-数字」</td></tr>
+<tr><td>检测样品台账</td><td>SYBD7.4-01</td><td class="num">—</td><td>原样编号保留，本中心编号按新规则续号</td></tr>
+<tr><td>控制计划</td><td>Excel / PDF</td><td class="num">—</td><td>Excel 导入向导；按关键词建议「适用检验类型」，编制人确认后保存为草稿再走发行</td></tr>
+<tr><td>组织与角色</td><td>人员名单 + 通达组织</td><td class="num">55</td><td>OA 同步；岗位映射默认角色；补齐实验室、班组长、总经理</td></tr>
+</tbody></table></div>
+</section>
+<section class="card">
+<h2 id="tbc">7　待确认项的设计默认值</h2>
+<p class="sec-intro">为不阻塞开发，每个待确认项都先按「建议答复」实现默认行为，并在 <code>sys_switch</code> 或配置表中留开关；顺翼答复后只改配置。</p>
+<div class="tbl"><table>
+<thead><tr><th>编号</th><th>问题</th><th>开发默认</th><th>改动成本</th></tr></thead>
+<tbody>
+<tr><td>Q1</td><td>项目节点是否固定</td><td>项目模板 + 新建后可增删</td><td><span class="tag t-ok">配置</span></td></tr>
+<tr><td>Q2</td><td>控制计划下拉选项</td><td>3.3 初稿入字典表</td><td><span class="tag t-ok">配置</span></td></tr>
+<tr><td>Q3–Q5</td><td>IQC/IPQC/OQC 取哪些字段</td><td>按「适用检验类型」列划分</td><td><span class="tag t-ok">已含</span></td></tr>
+<tr><td>Q6</td><td>订单/批次/特采录入</td><td>批次取检验单或 ERP；订单从 ERP 查询选择；特采单号手工关联</td><td><span class="tag t-warn">接口 #8 后可选</span></td></tr>
+<tr><td>Q7</td><td>委托合同流程</td><td>业务接待 → 委托人确认 → 组长承接分配</td><td><span class="tag t-ok">OA 流程可改</span></td></tr>
+<tr><td>Q8</td><td>其余 4 类原始记录</td><td>原始记录按「表头 + 核查 + 环境 + 测点 + 结论 + 签名」结构配置化，到位后补模板</td><td><span class="tag t-warn">每类约 1 人日</span></td></tr>
+<tr><td>Q9–Q10</td><td>报告取数与审批</td><td>3.6 取数表；原始记录提交即锁定，报告 3/2 节点，驳回解锁</td><td><span class="tag t-ok">配置</span></td></tr>
+<tr><td>Q11</td><td>料号与文件变化逻辑</td><td>外部变更新品号 = 原品号 + 新图面版本；内部料号不变、文件升版</td><td><span class="tag t-ok">已含</span></td></tr>
+<tr><td>R1</td><td>检验后补</td><td>允许 24 h 内后补并打「补录」标识，超时需主管审批</td><td><span class="tag t-ok">开关</span></td></tr>
+<tr><td>R2</td><td>AQL 抽样标准</td><td>预置 GB/T 2828.1 一般检验水平 II 表</td><td><span class="tag t-ok">配置</span></td></tr>
+<tr><td>R3</td><td>OQC 各类数据取哪个工序</td><td>尺寸取最后一道机加工序首件；表面处理取电镀；热处理取热处理工序与实验室硬度</td><td><span class="tag t-ok">配置</span></td></tr>
+<tr><td>R4</td><td>出货报告 OA 直发邮箱</td><td>默认关闭，生成 PDF 由业务下载发送</td><td><span class="tag t-ok">开关</span></td></tr>
+<tr><td>R5</td><td>会签部门谁指定；是否强制合单</td><td>品质判定人指定；同批次同缺陷类型提示追加，不强制</td><td><span class="tag t-ok">开关</span></td></tr>
+<tr><td>R6</td><td>8D/4D</td><td>以附件上传，不做结构化表单</td><td><span class="tag t-warn">做表单约 3 人日</span></td></tr>
+<tr><td>R7</td><td>单件成本来源</td><td>ERP 标准成本优先，取不到用品质部维护的费率表</td><td><span class="tag t-ok">配置</span></td></tr>
+<tr><td>R8</td><td>初审人；评估部门口径</td><td>初审人为角色「变更初审」；评估部门按 SY/QP15 A6 等级配置</td><td><span class="tag t-ok">配置</span></td></tr>
+<tr><td>R9</td><td>原始记录电子签名</td><td>手写签名 + 时间戳；同时提供打印签字页扫描归档入口</td><td><span class="tag t-ok">已含</span></td></tr>
+<tr><td>R10</td><td>ERP 推送、回写、锁定</td><td>适配器先做，开关默认关</td><td><span class="tag t-warn">接口文档到位后联调</span></td></tr>
+<tr><td>R11</td><td>单号规则</td><td>编号规则表配置，默认：借阅 JY、会签 HQ、更改 DCR、发放 DIS、补发 REI、打印 PRT、控制计划 CP-年-流水、检验 IQC/FA/PT/LA/OQC、异常 NC、委托 LAB、报告按类型前缀、样品 SP、项目 PRJ</td><td><span class="tag t-ok">配置</span></td></tr>
+<tr><td>—</td><td>OA 站内消息接口</td><td>通达 restapi 默认未开放消息发送，需厂商部署扩展；未开放前以 OA 待办 + 邮件兜底</td><td><span class="tag t-bad">依赖厂商</span></td></tr>
+</tbody></table></div>
+</section>
+<section class="card">
+<h2 id="plan">8　实施计划</h2>
+<div class="tbl"><table>
+<thead><tr><th>阶段</th><th>内容</th><th>交付</th></tr></thead>
+<tbody>
+<tr><td>S0 底座</td><td>OAuth2 免登、组织同步、消息、流程桥接（P1 插件回调 / P2 外部流程）、附件、签名、编号、字典、开关、ERP 适配器与 4 个只读接口</td><td>可登录、可选人、可收消息的空平台</td></tr>
+<tr><td>S1 文档</td><td>文件库 + 1,400 条导入；借阅、会签、更改、补发、受控打印 5 个 OA 流程配置与回调；发放回收；图纸推送回签</td><td>文控可脱离 Excel 一览表</td></tr>
+<tr><td>S2 控制计划 + 质检</td><td>控制计划编制、导入、发行生成模板；IQC/IPQC/OQC 检验终端；警示卡；SPC；出货报告（顺翼版 + 首批客户模板）</td><td>检验员在平板上完成首巡末</td></tr>
+<tr><td>S3 异常 + 变更</td><td>异常单全流程、成本、下工站确认、重新启用；ECN 8 节点、附录 A 配置、12 项部门事项、变更记录导入</td><td>异常与变更闭环可追溯</td></tr>
+<tr><td>S4 实验室 + 项目</td><td>委托合同、原始记录、报告 3/2 节点、19 类测试数据、样品领用归还、留样柜；项目台账、反馈、预警、甘特图</td><td>报告按批次可被 OQC 抓取</td></tr>
+<tr><td>S5 报表 + 上线</td><td>11 张报表与一句话结论、质量日报推送；用户培训；按 SY/QP15 附录 A「新的 QMS 模块」作 B 级变更上线</td><td>上线评审</td></tr>
+</tbody></table></div>
+<div class="callout warn"><b>开工前须顺翼提供：</b>鼎捷接口文档（方式与字段）、项目任务节点清单、4 类原始记录模板、5 类测试报告模板、质检终端截图、23 份客户模板空白表、人员名单补充（实验室、班组长、总经理、文控），以及第四章 Q1–Q11、R1–R11 的答复。</div>
+
+<footer>本设计依据《上海顺翼质量管理系统需求调研文档（字段级）》（2026-10-22）编写，替代 V1（依据 2026-10-15 调研报告）。代码仓库 docs/design/qms-design.html。</footer>
+</section>
+</main>
+</div>
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.proto-tabs [role=tab]'));
+  function show(t){tabs.forEach(function(b){var on=b===t;b.setAttribute('aria-selected',on?'true':'false');document.getElementById(b.getAttribute('aria-controls')).hidden=!on;});}
+  tabs.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+  document.querySelectorAll('[data-go]').forEach(function(btn){btn.addEventListener('click',function(){show(document.getElementById(btn.getAttribute('data-go')));});});
+  var links=[].slice.call(document.querySelectorAll('.oa-menu a'));
+  links.forEach(function(a){a.addEventListener('click',function(){links.forEach(function(x){x.classList.remove('cur');});a.classList.add('cur');});});
+  var body=document.getElementById('insp-body');
+  function judge(){
+    var allOk=true;
+    [].slice.call(body.rows).forEach(function(tr){
+      var l=parseFloat(tr.dataset.l),u=parseFloat(tr.dataset.u),ok=true;
+      tr.querySelectorAll('input').forEach(function(inp){var v=parseFloat(inp.value);var good=!isNaN(v)&&v>=l&&v<=u;inp.classList.toggle('ng',!good);inp.classList.toggle('okv',good);if(!good)ok=false;});
+      var r=tr.querySelector('.r');r.textContent=ok?'OK':'NG';r.className='r '+(ok?'res-ok':'res-ng');if(!ok)allOk=false;
+    });
+    var t=document.getElementById('insp-total');
+    t.textContent=allOk?'合格 · 回写 ERP 放行':'不合格 · 提示反应计划「隔离/调模」，可一键生成异常单';
+    t.className=allOk?'res-ok':'res-ng';
+  }
+  body.addEventListener('input',judge);judge();
+})();
+</script>
+</body>
+</html>
